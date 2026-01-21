@@ -69,10 +69,11 @@ class Poisson_reg(nn.Module):
 
     def D_loss(self,
                       x_clean: torch.Tensor,
+                      x_hat: torch.Tensor,
                       gradv: torch.Tensor,
                       ):
         #z = self.Encoder(x_clean)
-        score_value = self.model.score_value(x_clean)
+        score_value = self.model.score_value(x_clean,x_hat)
         return torch.tensordor(score_value,gradv,dim=1)
 
 
@@ -153,8 +154,8 @@ class AE_model(AE_base_model):
     def logp(self,x,x_hat):
         return ((x - x_hat)**2).mean()
 
-    def score_value(self,x):
-        y = self.logp(x)
+    def score_value(self,x,x_hat):
+        y = self.logp(x,x_hat)
         logp_grad = torch.autograd.grad(
             outputs=y,
             inputs=x,

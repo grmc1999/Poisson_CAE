@@ -295,7 +295,7 @@ def train(
 
             flux = PR.BC_loss(x,x_tilde,grad_v)
 
-            bulk = PR.D_loss(x,grad_v)
+            bulk = PR.D_loss(x,x_hat,grad_v)
 
             loss = logp + lam * (flux + bulk)
 
