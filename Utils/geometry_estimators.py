@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
-from grad_operations import green_reg, gradx_green_reg
+from .grad_operations import green_reg, gradx_green_reg
+from dataclasses import dataclass
 
+@dataclass
 class PoissonMCConfig:
     eps: float = 1e-2
     landmarks: int = 256          # M (per batch)
@@ -12,7 +14,7 @@ class PoissonMCEstimator(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-    def forward(self, x_query: torch.Tensor, x_land: torch.Tensor, g_land: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x_query: torch.Tensor, x_land: torch.Tensor, g_land: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Returns:
           v_hat: (B,)
