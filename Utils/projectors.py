@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import dataclass
+from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
 
 
