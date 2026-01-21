@@ -142,9 +142,7 @@ class Decoder(nn.Module):
 
 class AE_model(AE_base_model):
     def __init__(self,Encoder,Decoder):
-        super().__init__()
-        self.Encoder = Encoder
-        self.Decoder = Decoder
+        super().__init__(Encoder,Decoder)
 
     def forward(self,x):
         x_tilde = self.Decoder(self.Encoder(x))
