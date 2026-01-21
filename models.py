@@ -112,6 +112,8 @@ class Poisson_reg(nn.Module):
         #v, gradv = self.Estimate_field_grads(x_clean, x_tilde,landmarks)
 
         # Boundary-like flux term
+        print(gradv.shape)
+        print(n.shape)
         reg = (gradv * n).sum(dim=1).mean()
         return reg
     

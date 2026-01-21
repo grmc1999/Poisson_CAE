@@ -288,7 +288,7 @@ def train(
             x_tilde, _ = Pi(x)
 
             x_hat = model.forward(x)
-            grad_v = PR.Estimate_field_grads(x,x_tilde,landmarks = 100)
+            v, grad_v = PR.Estimate_field_grads(x,x_tilde,landmarks = 100)
 
             # CAE reconstruction: reconstruct clean x from corrupted hidden state
             logp = PR.ML_loss(x,x_hat)
