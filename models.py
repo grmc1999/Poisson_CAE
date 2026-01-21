@@ -76,7 +76,7 @@ class Poisson_reg(nn.Module):
         score_value = self.model.score_value(x_clean,x_hat)
         print(f"score_value {score_value.shape}")
         print(f"gradv {gradv.shape}")
-        return torch.tensordot(score_value,gradv,dims=1)
+        return torch.tensordot(score_value,gradv,dims=([-1],[-1])).mean()
 
 
     def BC_loss(self,
