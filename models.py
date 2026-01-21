@@ -64,7 +64,7 @@ class Poisson_reg(nn.Module):
 
         # Estimate ∇v at query points x_tilde (the corrupted/OOD points)
         x_query = x_tilde  # (B, d)
-        v, gradv = self.PoissonEstimator(x_query, x_land, g_land)  # gradv: (B, d)
+        v, gradv = self.PoissonEstimator.forward(x_query, x_land, g_land)  # gradv: (B, d)
         return v, gradv
 
     def D_loss(self,
