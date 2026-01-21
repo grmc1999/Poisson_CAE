@@ -277,7 +277,7 @@ def train(
 
     opt = torch.optim.Adam(list(model.parameters()), lr=lr)
 
-    PR = Poisson_reg(PoissonMCEstimator, model)
+    PR = Poisson_reg(poisson_est, model)
 
     step = 0
     for epoch in range(10**9):
