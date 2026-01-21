@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from grad_operations import green_reg, gradx_green_reg
 
