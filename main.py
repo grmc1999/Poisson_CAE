@@ -11,7 +11,7 @@ from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
 from Utils.geometry_estimators import PoissonMCConfig
 from Utils.geometry_estimators import PoissonMCEstimator
-from models import Poisson_reg
+from models import Poisson_reg,AE_model
 
 
 # -----------------------------
@@ -340,9 +340,14 @@ if __name__ == "__main__":
     # Poisson Monte Carlo estimator
     poisson_est = PoissonMCEstimator(PoissonMCConfig(eps=1e-2, landmarks=256))
 
+    #Poisson_reg
+    model = AE_model(
+        Encoder(d=2, h=128, z=32),
+        Decoder(z=32, h=128, d=2)
+    )
+
     h = train(
-        encoder=encoder,
-        decoder=decoder,
+        model = model,
         Pi=Pi,
         poisson_est=poisson_est,
         dataloader=loader,
