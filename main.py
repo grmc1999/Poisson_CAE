@@ -282,7 +282,7 @@ def train(
     step = 0
     for epoch in range(10**9):
         for (x,) in dataloader:
-            x = x.to(device)
+            x = x.to(device).requires_grad_(True)
 
             # Corrupt / OOD via Πψ
             x_tilde, _ = Pi(x)

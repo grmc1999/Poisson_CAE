@@ -74,7 +74,7 @@ class Poisson_reg(nn.Module):
                       ):
         #z = self.Encoder(x_clean)
         score_value = self.model.score_value(x_clean,x_hat)
-        return torch.tensordor(score_value,gradv,dim=1)
+        return torch.tensordot(score_value,gradv,dim=1)
 
 
     def BC_loss(self,
