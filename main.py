@@ -9,9 +9,8 @@ from torch.utils.data import DataLoader, TensorDataset
 from Utils.grad_operations import *
 from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
-from Utils.grad_operations import PoissonMCConfig
-from Utils.grad_operations import PoissonMCEstimator
-from Utils.grad_operations import CorruptionConfig
+from Utils.geometry_estimators import PoissonMCConfig
+from Utils.geometry_estimators import PoissonMCEstimator
 from models import Poisson_reg
 
 
