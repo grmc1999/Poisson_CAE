@@ -21,7 +21,7 @@ class AE_base_model(nn.Module):
             retain_graph=True,
             only_inputs=True,
         )[0]
-        print(logp_grad.shape)
+
         return logp_grad
 
     def forward(self,x):
@@ -74,8 +74,6 @@ class Poisson_reg(nn.Module):
                       ):
         #z = self.Encoder(x_clean)
         score_value = self.model.score_value(x_clean,x_hat)
-        print(f"score_value {score_value.shape}")
-        print(f"gradv {gradv.shape}")
         return torch.tensordot(score_value,gradv,dims=([-1],[-1])).mean()
 
 
@@ -99,24 +97,6 @@ class Poisson_reg(nn.Module):
         # nψ(x) = (Πψ(x) - x) / ||Πψ(x) - x||
         delta = x_tilde - x_clean
         n = delta / (delta.norm(dim=1, keepdim=True) + 1e-8)  # (B, d)
-
-        ## Choose landmark points from the corrupted batch (Monte Carlo quadrature set)
-        #M = min(landmarks, B)
-        #idx = torch.randperm(B, device=x_clean.device)[:M]
-        #x_land = x_tilde[idx].clone().requires_grad_(True)  # (M, d)
-#
-        ## Source term g(y)=||∇f(y)||_F at landmarks; requires higher-order grads for training
-        #g_land = jacobian_fro_norm(encoder, x_land, create_graph=True)   # (M,)
-#
-        ## Estimate ∇v at query points x_tilde (the corrupted/OOD points)
-        #x_query = x_tilde  # (B, d)
-        #_, gradv = self.PoissonEstimator(x_query, x_land, g_land)  # gradv: (B, d)
-
-        #v, gradv = self.Estimate_field_grads(x_clean, x_tilde,landmarks)
-
-        # Boundary-like flux term
-        print(gradv.shape)
-        print(n.shape)
         reg = (gradv * n).sum(dim=1).mean()
         return reg
     
@@ -165,6 +145,5 @@ class AE_model(AE_base_model):
             retain_graph=True,
             only_inputs=True,
         )[0]
-        print(logp_grad.shape)
         return logp_grad
 
