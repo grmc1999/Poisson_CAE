@@ -11,7 +11,9 @@ from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
 from Utils.geometry_estimators import PoissonMCConfig
 from Utils.geometry_estimators import PoissonMCEstimator
+from Utils.visualization import visualize_representations
 from models import Poisson_reg,AE_model
+
 
 
 # -----------------------------
@@ -140,4 +142,19 @@ if __name__ == "__main__":
         landmarks=256,
         device=device,
         steps=1000,
+    )
+
+    viz_dir = os.path.join("runs", _timestamp(), "viz")
+    visualize_representations(
+        encoder=encoder,
+        poisson_estimator=poisson_est,     # your object
+        corruption_operator=Pi, # Πψ(x)
+        dataloader=test_loader if 'test_loader' in locals() else train_loader,
+        device=device,
+        outdir=viz_dir,
+        z_dim=z_dim,
+        hutchinson_fn=hutchinson_jacobian_fro_norm,  # or whatever you named it
+        hutchinson_samples=1,
+        n_batches=4,
+        landmarks=128,
     )
