@@ -109,7 +109,7 @@ def visualize_fields_2d(
         f1, f2 = z[:, 0], z[:, 1]
         T_p = TSNE(n_components=2, learning_rate='auto',
                   init='random', perplexity=3).fit(z)
-        zp=T_p(z)
+        zp=T_p.transform(z)
         print("z shape")
         print(zp.shape)
         f1, f2 = zp[:, 0], zp[:, 1]
@@ -122,8 +122,8 @@ def visualize_fields_2d(
     v, gradv = poisson_reg.Estimate_field_grads(grid_req, x_tilde.detach(), landmarks=cfg.landmarks)
     v = v.detach()
     gradv = gradv.detach()
-    gradv = T_p(gradv)
-    x_batch = T_p(x_batch)
+    gradv = T_p.transform(gradv)
+    x_batch = T_p.transform(x_batch)
     print("x shape")
     print(x_batch.shape)
 
