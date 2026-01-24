@@ -79,9 +79,9 @@ def train(
             # CAE reconstruction: reconstruct clean x from corrupted hidden state
             logp = PR.ML_loss(x,x_hat)
 
-            flux = PR.BC_loss(x,x_tilde,grad_v)
+            flux = PR.BC_loss(x,x_tilde,x_hat,grad_v)
 
-            bulk = PR.D_loss(x,x_hat,grad_v)
+            bulk = PR.D_loss(x,model.forward(x_tilde),grad_v)
 
             loss = logp + lam * (flux + bulk)
 

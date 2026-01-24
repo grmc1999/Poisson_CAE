@@ -81,6 +81,7 @@ class Poisson_reg(nn.Module):
         #encoder: nn.Module,
         x_clean: torch.Tensor,
         x_tilde: torch.Tensor,
+        x_hat: torch.Tensor,
         #v: torch.Tensor,
         gradv: torch.Tensor,
         #landmarks: int = 256,
@@ -97,7 +98,7 @@ class Poisson_reg(nn.Module):
         # nψ(x) = (Πψ(x) - x) / ||Πψ(x) - x||
         delta = x_tilde - x_clean
         n = delta / (delta.norm(dim=1, keepdim=True) + 1e-8)  # (B, d)
-        reg = (x_tilde*(gradv * n).sum(dim=1)).mean()
+        reg = (x_hat*(gradv * n).sum(dim=1)).mean()
         return reg
 
 
