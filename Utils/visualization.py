@@ -121,10 +121,6 @@ def visualize_fields_2d(
     v, gradv = poisson_reg.Estimate_field_grads(grid_req, x_tilde.detach(), landmarks=cfg.landmarks)
     v = v.detach()
     gradv = gradv.detach()
-    gradv = T_p.transform(gradv)
-    x_batch = T_p.transform(x_batch)
-    print("x shape")
-    print(x_batch.shape)
 
     # Reshape scalars to (grid_n, grid_n)
     def R(u: torch.Tensor) -> torch.Tensor:
