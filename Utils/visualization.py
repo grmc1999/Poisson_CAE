@@ -21,6 +21,7 @@ from typing import Optional, Tuple
 import torch
 
 from .grad_operations import jacobian_fro_norm
+from sklearn.decomposition import PCA
 
 
 @dataclass
@@ -106,6 +107,9 @@ def visualize_fields_2d(
         f2 = torch.zeros_like(f1)
     else:
         f1, f2 = z[:, 0], z[:, 1]
+        T_p = PCA(n_components=2).fit(z)
+        zp=T_p.transform(z)
+        f1, f2 = zp[:, 0], zp[:, 1]
     fnorm = z.norm(dim=1)
 
     # ||∇ f(x)||_F on the grid
@@ -118,10 +122,10 @@ def visualize_fields_2d(
 
     # Reshape scalars to (grid_n, grid_n)
     def R(u: torch.Tensor) -> torch.Tensor:
-        return u.reshape(cfg.grid_n, cfg.grid_n).cpu()
+        return u.reshape(cfg.grid_n, cfg.grid_n)
 
-    v_img = R(v)
-    g_img = R(g)
+    v_img = R(v).cpu()
+    g_img = R(g).cpu()
     f1_img, f2_img = R(f1), R(f2)
     fn_img = R(fnorm)
 
@@ -131,8 +135,8 @@ def visualize_fields_2d(
     Yc = Y[::q, ::q].cpu()
     gvx = gradv[:, 0].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
     gvy = gradv[:, 1].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
-    f1q = f1.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
-    f2q = f2.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
+    f1q = f1.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q]#.cpu()
+    f2q = f2.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q]#.cpu()
 
     fig, axes = plt.subplots(2, 2, figsize=(10, 8), dpi=cfg.dpi)
     ax = axes[0, 0]
