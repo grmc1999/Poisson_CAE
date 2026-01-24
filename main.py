@@ -11,7 +11,6 @@ from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
 from Utils.geometry_estimators import PoissonMCConfig
 from Utils.geometry_estimators import PoissonMCEstimator
-from Utils.visualization import visualize_fields_2d, Viz2DConfig
 
 from models import Poisson_reg,AE_model
 
@@ -56,10 +55,9 @@ def train(
     landmarks: int = 256,
     device: str = "cuda",
     steps: int = 5000,
-    viz_every: int = 500,
-    viz_dir: str = "outputs",
 ):
     model.to(device).train()
+    decoder.to(device).train()
     Pi.to(device).train()
     poisson_est.to(device).train()
 
@@ -76,7 +74,7 @@ def train(
             x_tilde, _ = Pi(x)
 
             x_hat = model.forward(x)
-            v, grad_v = PR.Estimate_field_grads(x, x_tilde, landmarks=landmarks)
+            v, grad_v = PR.Estimate_field_grads(x,x_tilde,landmarks = 100)
 
             # CAE reconstruction: reconstruct clean x from corrupted hidden state
             logp = PR.ML_loss(x,x_hat)
@@ -98,22 +96,12 @@ def train(
                       flux={flux.item():.6f}\
                       bulk={bulk.item():.6f}\
                       loss={loss.item():.6f}")
+                
+            # Example: run viz every 5 epochs
+        # inside your epoch loop (after training steps), run viz on one batch
 
-            # Visualize learned fields (2D toy case)
-            if viz_every > 0 and (step % viz_every == 0):
-                try:
-                    _ = visualize_fields_2d(
-                        model=model,
-                        poisson_reg=PR,
-                        projector=Pi,
-                        x_batch=x.detach(),
-                        out_dir=viz_dir,
-                        step=step,
-                        device=device,
-                        cfg=Viz2DConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160),
-                    )
-                except Exception as e:
-                    print(f"[viz] warning: visualization failed at step {step}: {e}")
+
+
             if step >= steps:
                 return x_hat
 
@@ -123,20 +111,6 @@ def train(
 # -----------------------------
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Create a ArcHydro schema')
-    parser.add_argument('--batch',type=int, metavar='path', required=True,
-                        help='the path to workspace')
-    parser.add_argument('--lr',type=float, metavar='path', required=True,
-                        help='the path to workspace')
-    parser.add_argument('--lam',type=float, metavar='path', required=True,
-                        help='path to schema')
-    parser.add_argument('--landmarks',type=int, metavar='path', required=True,
-                        help='path to dem')
-    parser.add_argument('--steps',type=int, metavar='path', required=True,
-                        help='path to dem')
-    args = parser.parse_args()
 
     # Toy in-domain data: mixture of Gaussians in R^2
     torch.manual_seed(0)
@@ -147,16 +121,16 @@ if __name__ == "__main__":
     comp = torch.randint(0, centers.size(0), (N,))
     x = centers[comp] + 0.15 * torch.randn(N, 2)
 
-    loader = DataLoader(TensorDataset(x), batch_size=args.batch, shuffle=True, drop_last=True)
+    loader = DataLoader(TensorDataset(x), batch_size=256, shuffle=True, drop_last=True)
 
     encoder = Encoder(d=2, h=128, z=32)
     decoder = Decoder(z=32, h=128, d=2)
 
     # Corruption operator Πψ: diffusion-like by default (your "go" -> ddpm)
-    Pi = CorruptionOperator(CorruptionConfig(mode="gaussian", T=200, beta_start=1e-4, beta_end=2e-2))
+    Pi = CorruptionOperator(CorruptionConfig(mode="ddpm", T=200, beta_start=1e-4, beta_end=2e-2))
 
     # Poisson Monte Carlo estimator
-    poisson_est = PoissonMCEstimator(PoissonMCConfig(eps=1e-2, landmarks=args.landmarks))
+    poisson_est = PoissonMCEstimator(PoissonMCConfig(eps=1e-2, landmarks=256))
 
     #Poisson_reg
     model = AE_model(
@@ -169,10 +143,10 @@ if __name__ == "__main__":
         Pi=Pi,
         poisson_est=poisson_est,
         dataloader=loader,
-        lr=args.lr,
-        lam=args.lam,
-        landmarks=args.landmarks,
+        lr=1e-3,
+        lam=1e-2,
+        landmarks=256,
         device=device,
-        steps=args.steps,
+        steps=1000,
     )
 

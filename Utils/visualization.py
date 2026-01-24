@@ -1,180 +1,184 @@
 """Visualization utilities.
 
-This project studies geometric/Poisson regularization terms. For quick
-sanity-checks we provide simple plotting functions for 2D toy datasets.
+This repo started with 2D toy experiments. For MNIST we visualize:
+  - f(x): latent codes and norms
+  - ||∇f(x)||: contractive source term histogram
+  - v(x): Poisson potential histogram
+  - ∇v: in pixel space (flattened) we show ||∇v|| as an image heatmap
 
-We visualize:
-  - f(x): encoder representation (first 2 components + norm)
-  - ||∇ f(x)||_F: Jacobian Frobenius norm of the encoder
-  - v(x): Poisson potential estimated by the Monte Carlo Green's estimator
-  - ∇v(x): gradient field of the Poisson potential
-
-These functions are intentionally lightweight and depend only on matplotlib.
+All functions save PNGs to disk (no interactive windows), keeping main scripts clean.
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 
-from .grad_operations import jacobian_fro_norm
-from sklearn.decomposition import PCA
-
 
 @dataclass
-class Viz2DConfig:
-    grid_n: int = 160
-    padding: float = 0.75
-    landmarks: int = 256
-    dpi: int = 160
+class VizConfig:
+    out_dir: str = "outputs"
+    max_items: int = 8
+    dpi: int = 120
 
 
-def _make_2d_grid_from_batch(
-    x_batch: torch.Tensor,
-    grid_n: int,
-    padding: float,
-    device: torch.device,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Create a 2D grid covering the batch extent."""
-    assert x_batch.shape[1] == 2, "2D visualization expects d=2 inputs"
-
-    x_min = x_batch.min(dim=0).values - padding
-    x_max = x_batch.max(dim=0).values + padding
-
-    xs = torch.linspace(x_min[0].item(), x_max[0].item(), grid_n, device=device)
-    ys = torch.linspace(x_min[1].item(), x_max[1].item(), grid_n, device=device)
-    X, Y = torch.meshgrid(xs, ys, indexing="xy")
-    grid = torch.stack([X.reshape(-1), Y.reshape(-1)], dim=1)  # (grid_n^2, 2)
-    return grid, X, Y
+def _ensure_dir(path: str) -> None:
+    os.makedirs(path, exist_ok=True)
 
 
-def visualize_fields_2d(
+@torch.no_grad()
+def visualize_mnist_flat(
+    x_clean: torch.Tensor,         # (B, 784)
+    x_corrupt: torch.Tensor,       # (B, 784)
+    x_hat: torch.Tensor,           # (B, 784)
     *,
-    model,
-    poisson_reg,
-    projector,
-    x_batch: torch.Tensor,
-    out_dir: str,
+    f: torch.Tensor,               # (B, z)
+    g: torch.Tensor,               # (B,)
+    v: torch.Tensor,               # (B,)
+    gradv: Optional[torch.Tensor], # (B, 784)
     step: int,
-    device: str | torch.device = "cpu",
-    cfg: Optional[Viz2DConfig] = None,
+    cfg: VizConfig = VizConfig(),
+    title: str = "mnist_flat",
 ) -> str:
-    """Save a 2D visualization of f, ||∇f||, v and ∇v.
-
-    Parameters
-    ----------
-    model:
-        AE_model (must expose model.Encoder)
-    poisson_reg:
-        Poisson_reg instance (must expose Estimate_field_grads)
-    projector:
-        CorruptionOperator (Πψ) returning (x_tilde, t)
-    x_batch:
-        (B,2) batch of data
-    out_dir:
-        directory to save figures
-    step:
-        training step (used in filename)
-
-    Returns
-    -------
-    Path to the saved PNG.
-    """
-    cfg = cfg or Viz2DConfig()
-    os.makedirs(out_dir, exist_ok=True)
-    device = torch.device(device)
-
-    # Lazy import to keep core dependencies minimal.
+    """Save a multi-panel figure for flattened MNIST."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    x_batch = x_batch.detach().to(device)
-    grid, X, Y = _make_2d_grid_from_batch(x_batch, cfg.grid_n, cfg.padding, device)
-    grid_req = grid.clone().requires_grad_(True)
+    _ensure_dir(cfg.out_dir)
+    B = x_clean.size(0)
+    K = min(cfg.max_items, B)
 
-    # Apply Πψ to get corrupted points (used in Poisson regularizer).
-    x_tilde, _ = projector(grid_req)
+    x0 = x_clean[:K].view(K, 28, 28).cpu()
+    xc = x_corrupt[:K].view(K, 28, 28).cpu()
+    xr = x_hat[:K].view(K, 28, 28).cpu()
 
-    # f(x): take first 2 dims (if z<2, fall back to repeating)
-    with torch.no_grad():
-        z = model.Encoder(grid_req)
-    if z.shape[1] == 1:
-        f1 = z[:, 0]
-        f2 = torch.zeros_like(f1)
+    fig = plt.figure(figsize=(12, 8), dpi=cfg.dpi)
+    gs = fig.add_gridspec(3, 4, height_ratios=[1.0, 1.0, 1.0])
+
+    # Row 1: images
+    ax = fig.add_subplot(gs[0, 0]); ax.set_title("clean")
+    ax.imshow(torch.cat(list(x0), dim=1), cmap="gray"); ax.axis("off")
+    ax = fig.add_subplot(gs[0, 1]); ax.set_title("corrupted")
+    ax.imshow(torch.cat(list(xc), dim=1), cmap="gray"); ax.axis("off")
+    ax = fig.add_subplot(gs[0, 2]); ax.set_title("recon")
+    ax.imshow(torch.cat(list(xr), dim=1), cmap="gray"); ax.axis("off")
+
+    # Row 1 col 4: ||∇v|| heatmap for first sample
+    ax = fig.add_subplot(gs[0, 3]); ax.set_title("||∇v(x)|| (sample 0)")
+    if gradv is None:
+        ax.text(0.1, 0.5, "gradv=None", fontsize=10)
+        ax.axis("off")
     else:
-        f1, f2 = z[:, 0], z[:, 1]
-        T_p = PCA(n_components=2).fit(z)
-        zp=T_p.transform(z)
-        f1, f2 = zp[:, 0], zp[:, 1]
-    fnorm = z.norm(dim=1)
+        gv = gradv[0].view(28, 28).abs().cpu()
+        ax.imshow(gv, cmap="magma"); ax.axis("off")
 
-    # ||∇ f(x)||_F on the grid
-    g = jacobian_fro_norm(model.Encoder, grid_req, create_graph=False).detach()
+    # Row 2: scalar histograms
+    ax = fig.add_subplot(gs[1, 0]); ax.set_title("||f(x)||")
+    ax.hist(f.norm(dim=1).detach().cpu().numpy(), bins=30)
+    ax = fig.add_subplot(gs[1, 1]); ax.set_title("||∇f(x)||_F")
+    ax.hist(g.detach().cpu().numpy(), bins=30)
+    ax = fig.add_subplot(gs[1, 2]); ax.set_title("v(x)")
+    ax.hist(v.detach().cpu().numpy(), bins=30)
 
-    # v(x) and ∇v(x) using the repo's estimator
-    v, gradv = poisson_reg.Estimate_field_grads(grid_req, x_tilde.detach(), landmarks=cfg.landmarks)
-    v = v.detach()
-    gradv = gradv.detach()
+    # Row 2 col 4: scatter of first 2 latent dims (if available)
+    ax = fig.add_subplot(gs[1, 3]); ax.set_title("f(x) (first 2 dims)")
+    if f.size(1) >= 2:
+        z = f.detach().cpu()
+        ax.scatter(z[:, 0], z[:, 1], s=5, alpha=0.6)
+    else:
+        ax.text(0.1, 0.5, "latent dim < 2", fontsize=10)
 
-    # Reshape scalars to (grid_n, grid_n)
-    def R(u: torch.Tensor) -> torch.Tensor:
-        return u.reshape(cfg.grid_n, cfg.grid_n)
+    # Row 3: per-sample values table-ish
+    ax = fig.add_subplot(gs[2, :])
+    ax.axis("off")
+    vals = []
+    for i in range(min(10, B)):
+        vals.append(f"i={i}: ||f||={f[i].norm().item():.3f},  g={g[i].item():.3f},  v={v[i].item():.3f}")
+    ax.text(0.01, 0.95, "\n".join(vals), va="top", family="monospace")
 
-    v_img = R(v).cpu()
-    g_img = R(g).cpu()
-    f1_img, f2_img = R(f1), R(f2)
-    fn_img = R(fnorm)
-
-    # Quiver downsample factor (avoid too many arrows)
-    q = max(1, cfg.grid_n // 25)
-    Xc = X[::q, ::q].cpu()
-    Yc = Y[::q, ::q].cpu()
-    gvx = gradv[:, 0].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
-    gvy = gradv[:, 1].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
-    f1q = f1.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q]#.cpu()
-    f2q = f2.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q]#.cpu()
-
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8), dpi=cfg.dpi)
-    ax = axes[0, 0]
-    im = ax.contourf(X.cpu(), Y.cpu(), fn_img, levels=40)
-    ax.quiver(Xc, Yc, f1q, f2q, angles="xy", scale_units="xy", scale=None, width=0.002)
-    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
-    ax.set_title("f(x): ||f|| (contour) + first-2 comps (quiver)")
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    ax = axes[0, 1]
-    im = ax.contourf(X.cpu(), Y.cpu(), g_img, levels=40)
-    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
-    ax.set_title(r"$||\nabla f(x)||_F$ (contour)")
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    ax = axes[1, 0]
-    im = ax.contourf(X.cpu(), Y.cpu(), v_img, levels=40)
-    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
-    ax.set_title("v(x) (Poisson potential; contour)")
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    ax = axes[1, 1]
-    speed = torch.sqrt(gvx**2 + gvy**2)
-    im = ax.contourf(X.cpu(), Y.cpu(), R(torch.sqrt((gradv**2).sum(dim=1))), levels=40)
-    ax.quiver(Xc, Yc, gvx, gvy, angles="xy", scale_units="xy", scale=None, width=0.002)
-    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
-    ax.set_title(r"$\nabla v(x)$ (quiver) and $||\nabla v||$ (contour)")
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    for ax in axes.reshape(-1):
-        ax.set_aspect("equal", adjustable="box")
-        ax.set_xlabel("x1")
-        ax.set_ylabel("x2")
-
-    fig.suptitle(f"Poisson-CAE fields @ step {step}", y=1.02)
+    fig.suptitle(f"{title} | step={step}")
+    out_path = os.path.join(cfg.out_dir, f"{title}_step_{step:06d}.png")
     fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+    return out_path
 
-    out_path = os.path.join(out_dir, f"fields_step_{step:06d}.png")
-    fig.savefig(out_path, bbox_inches="tight")
+
+@torch.no_grad()
+def visualize_mnist_conv(
+    x_clean: torch.Tensor,         # (B,1,28,28)
+    x_corrupt: torch.Tensor,       # (B,1,28,28)
+    x_hat: torch.Tensor,           # (B,1,28,28)
+    *,
+    z: torch.Tensor,               # (B, zdim) clean
+    z_tilde: torch.Tensor,         # (B, zdim) corrupted
+    g: torch.Tensor,               # (B,) source term
+    v: torch.Tensor,               # (B,) potential
+    gradv: torch.Tensor,           # (B, zdim)
+    step: int,
+    cfg: VizConfig = VizConfig(),
+    title: str = "mnist_conv",
+) -> str:
+    """Save a multi-panel figure for conv MNIST (latent-space Poisson)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    _ensure_dir(cfg.out_dir)
+    B = x_clean.size(0)
+    K = min(cfg.max_items, B)
+
+    x0 = x_clean[:K].squeeze(1).cpu()
+    xc = x_corrupt[:K].squeeze(1).cpu()
+    xr = x_hat[:K].squeeze(1).cpu()
+
+    fig = plt.figure(figsize=(12, 8), dpi=cfg.dpi)
+    gs = fig.add_gridspec(3, 4)
+
+    ax = fig.add_subplot(gs[0, 0]); ax.set_title("clean")
+    ax.imshow(torch.cat(list(x0), dim=1), cmap="gray"); ax.axis("off")
+    ax = fig.add_subplot(gs[0, 1]); ax.set_title("corrupted")
+    ax.imshow(torch.cat(list(xc), dim=1), cmap="gray"); ax.axis("off")
+    ax = fig.add_subplot(gs[0, 2]); ax.set_title("recon")
+    ax.imshow(torch.cat(list(xr), dim=1), cmap="gray"); ax.axis("off")
+
+    # Show ||gradv|| per-sample (latent), not pixel
+    ax = fig.add_subplot(gs[0, 3]); ax.set_title("||∇v(z)||")
+    ax.hist(gradv.norm(dim=1).detach().cpu().numpy(), bins=30)
+
+    # Histograms
+    ax = fig.add_subplot(gs[1, 0]); ax.set_title("||z||")
+    ax.hist(z.norm(dim=1).detach().cpu().numpy(), bins=30)
+    ax = fig.add_subplot(gs[1, 1]); ax.set_title("||z_tilde-z||")
+    ax.hist((z_tilde - z).norm(dim=1).detach().cpu().numpy(), bins=30)
+    ax = fig.add_subplot(gs[1, 2]); ax.set_title("||∇f|| (Hutchinson)")
+    ax.hist(g.detach().cpu().numpy(), bins=30)
+    ax = fig.add_subplot(gs[1, 3]); ax.set_title("v(z_tilde)")
+    ax.hist(v.detach().cpu().numpy(), bins=30)
+
+    # Scatter first 2 dims
+    ax = fig.add_subplot(gs[2, :2]); ax.set_title("z (first 2 dims)")
+    if z.size(1) >= 2:
+        zz = z.detach().cpu()
+        ax.scatter(zz[:, 0], zz[:, 1], s=5, alpha=0.6)
+    else:
+        ax.text(0.1, 0.5, "latent dim < 2", fontsize=10)
+
+    ax = fig.add_subplot(gs[2, 2:]); ax.axis("off")
+    vals = []
+    for i in range(min(10, B)):
+        vals.append(
+            f"i={i}: ||z||={z[i].norm().item():.3f},  g={g[i].item():.3f},  v={v[i].item():.3f},  ||∇v||={gradv[i].norm().item():.3f}"
+        )
+    ax.text(0.01, 0.95, "\n".join(vals), va="top", family="monospace")
+
+    fig.suptitle(f"{title} | step={step}")
+    out_path = os.path.join(cfg.out_dir, f"{title}_step_{step:06d}.png")
+    fig.tight_layout()
+    fig.savefig(out_path)
     plt.close(fig)
     return out_path
