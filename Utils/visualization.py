@@ -109,8 +109,6 @@ def visualize_fields_2d(
         f1, f2 = z[:, 0], z[:, 1]
         T_p = PCA(n_components=2).fit(z)
         zp=T_p.transform(z)
-        print("z shape")
-        print(zp.shape)
         f1, f2 = zp[:, 0], zp[:, 1]
     fnorm = z.norm(dim=1)
 
@@ -124,10 +122,10 @@ def visualize_fields_2d(
 
     # Reshape scalars to (grid_n, grid_n)
     def R(u: torch.Tensor) -> torch.Tensor:
-        return u.reshape(cfg.grid_n, cfg.grid_n).cpu()
+        return u.reshape(cfg.grid_n, cfg.grid_n)
 
-    v_img = R(v)
-    g_img = R(g)
+    v_img = R(v).cpu()
+    g_img = R(g).cpu()
     f1_img, f2_img = R(f1), R(f2)
     fn_img = R(fnorm)
 
