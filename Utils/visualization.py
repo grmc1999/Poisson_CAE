@@ -21,6 +21,7 @@ from typing import Optional, Tuple
 import torch
 
 from .grad_operations import jacobian_fro_norm
+from sklearn.manifold import TSNE
 
 
 @dataclass
@@ -106,6 +107,12 @@ def visualize_fields_2d(
         f2 = torch.zeros_like(f1)
     else:
         f1, f2 = z[:, 0], z[:, 1]
+        T_p = TSNE(n_components=2, learning_rate='auto',
+                  init='random', perplexity=3).fit(z)
+        zp=T_p(z)
+        print("z shape")
+        print(zp.shape)
+        f1, f2 = zp[:, 0], zp[:, 1]
     fnorm = z.norm(dim=1)
 
     # ||∇ f(x)||_F on the grid
@@ -115,6 +122,10 @@ def visualize_fields_2d(
     v, gradv = poisson_reg.Estimate_field_grads(grid_req, x_tilde.detach(), landmarks=cfg.landmarks)
     v = v.detach()
     gradv = gradv.detach()
+    gradv = T_p(gradv)
+    x_batch = T_p(x_batch)
+    print("x shape")
+    print(x_batch.shape)
 
     # Reshape scalars to (grid_n, grid_n)
     def R(u: torch.Tensor) -> torch.Tensor:
