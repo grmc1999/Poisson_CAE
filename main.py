@@ -126,6 +126,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Create a ArcHydro schema')
+    parser.add_argument('--batch',type=float, metavar='path', required=True,
+                        help='the path to workspace')
     parser.add_argument('--lr',type=float, metavar='path', required=True,
                         help='the path to workspace')
     parser.add_argument('--lam',type=float, metavar='path', required=True,
@@ -145,16 +147,16 @@ if __name__ == "__main__":
     comp = torch.randint(0, centers.size(0), (N,))
     x = centers[comp] + 0.15 * torch.randn(N, 2)
 
-    loader = DataLoader(TensorDataset(x), batch_size=256, shuffle=True, drop_last=True)
+    loader = DataLoader(TensorDataset(x), batch_size=args.batch, shuffle=True, drop_last=True)
 
     encoder = Encoder(d=2, h=128, z=32)
     decoder = Decoder(z=32, h=128, d=2)
 
     # Corruption operator Πψ: diffusion-like by default (your "go" -> ddpm)
-    Pi = CorruptionOperator(CorruptionConfig(mode="ddpm", T=200, beta_start=1e-4, beta_end=2e-2))
+    Pi = CorruptionOperator(CorruptionConfig(mode="gaussian", T=200, beta_start=1e-4, beta_end=2e-2))
 
     # Poisson Monte Carlo estimator
-    poisson_est = PoissonMCEstimator(PoissonMCConfig(eps=1e-2, landmarks=256))
+    poisson_est = PoissonMCEstimator(PoissonMCConfig(eps=1e-2, landmarks=args.landmarks))
 
     #Poisson_reg
     model = AE_model(
