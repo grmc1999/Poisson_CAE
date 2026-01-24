@@ -157,7 +157,7 @@ class Poisson_reg_latent(nn.Module):
         n = delta / (delta.norm(dim=1, keepdim=True) + 1e-8)
         print("x_hat")
         print(x_hat.shape)
-        return (x_hat*(gradv * n).sum(dim=1)).mean()
+        return ((gradv * n).sum(dim=1)).mean()
     
 
 
