@@ -137,8 +137,8 @@ def visualize_fields_2d(
     Yc = Y[::q, ::q].cpu()
     gvx = gradv[:, 0].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
     gvy = gradv[:, 1].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
-    f1q = f1.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
-    f2q = f2.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
+    f1q = f1.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q]#.cpu()
+    f2q = f2.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q]#.cpu()
 
     fig, axes = plt.subplots(2, 2, figsize=(10, 8), dpi=cfg.dpi)
     ax = axes[0, 0]
