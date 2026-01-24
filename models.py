@@ -154,6 +154,8 @@ class Poisson_reg_latent(nn.Module):
     def BC_loss_latent(self, x_hat: torch.Tensor, z_clean: torch.Tensor, z_tilde: torch.Tensor, gradv: torch.Tensor) -> torch.Tensor:
         delta = z_tilde - z_clean
         n = delta / (delta.norm(dim=1, keepdim=True) + 1e-8)
+        print("x_hat")
+        print(x_hat.shape)
         return (x_hat*(gradv * n).sum(dim=1)).mean()
     
 
