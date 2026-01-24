@@ -72,7 +72,7 @@ def main(
 
         # Poisson in latent space
         v, gradv, z_clean, z_tilde, g_land = PR.Estimate_field_grads(x, x_tilde, landmarks=landmarks)
-        flux = PR.BC_loss_latent(z_clean, z_tilde, gradv)
+        flux = PR.BC_loss_latent(x_hat, z_clean, z_tilde, gradv)
 
         # In this conv setup: only latent flux term
         loss = logp + lam * flux

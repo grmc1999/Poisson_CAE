@@ -97,7 +97,7 @@ class Poisson_reg(nn.Module):
         # nψ(x) = (Πψ(x) - x) / ||Πψ(x) - x||
         delta = x_tilde - x_clean
         n = delta / (delta.norm(dim=1, keepdim=True) + 1e-8)  # (B, d)
-        reg = (gradv * n).sum(dim=1).mean()
+        reg = x_tilde*(gradv * n).sum(dim=1).mean()
         return reg
 
 
@@ -151,10 +151,10 @@ class Poisson_reg_latent(nn.Module):
         v, gradv = self.PoissonEstimator.forward(z_tilde, z_land, g_land)  # (B,), (B, z_dim)
         return v, gradv, z_clean, z_tilde, g_land
 
-    def BC_loss_latent(self, z_clean: torch.Tensor, z_tilde: torch.Tensor, gradv: torch.Tensor) -> torch.Tensor:
+    def BC_loss_latent(self, x_hat: torch.Tensor, z_clean: torch.Tensor, z_tilde: torch.Tensor, gradv: torch.Tensor) -> torch.Tensor:
         delta = z_tilde - z_clean
         n = delta / (delta.norm(dim=1, keepdim=True) + 1e-8)
-        return (gradv * n).sum(dim=1).mean()
+        return (x_hat*(gradv * n).sum(dim=1)).mean()
     
 
 
