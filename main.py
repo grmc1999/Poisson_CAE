@@ -126,7 +126,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Create a ArcHydro schema')
-    parser.add_argument('--batch',type=float, metavar='path', required=True,
+    parser.add_argument('--batch',type=int, metavar='path', required=True,
                         help='the path to workspace')
     parser.add_argument('--lr',type=float, metavar='path', required=True,
                         help='the path to workspace')
