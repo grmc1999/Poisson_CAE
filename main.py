@@ -126,13 +126,13 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Create a ArcHydro schema')
-    parser.add_argument('--lr', metavar='path', required=True,
+    parser.add_argument('--lr',type=float, metavar='path', required=True,
                         help='the path to workspace')
-    parser.add_argument('--lam', metavar='path', required=True,
+    parser.add_argument('--lam',type=float, metavar='path', required=True,
                         help='path to schema')
-    parser.add_argument('--landmarks', metavar='path', required=True,
+    parser.add_argument('--landmarks',type=int, metavar='path', required=True,
                         help='path to dem')
-    parser.add_argument('--steps', metavar='path', required=True,
+    parser.add_argument('--steps',type=int, metavar='path', required=True,
                         help='path to dem')
     args = parser.parse_args()
 
