@@ -1,194 +1,176 @@
-# =========================
-# VISUALIZATION UTILITIES
-# =========================
+"""Visualization utilities.
+
+This project studies geometric/Poisson regularization terms. For quick
+sanity-checks we provide simple plotting functions for 2D toy datasets.
+
+We visualize:
+  - f(x): encoder representation (first 2 components + norm)
+  - ||∇ f(x)||_F: Jacobian Frobenius norm of the encoder
+  - v(x): Poisson potential estimated by the Monte Carlo Green's estimator
+  - ∇v(x): gradient field of the Poisson potential
+
+These functions are intentionally lightweight and depend only on matplotlib.
+"""
+
+from __future__ import annotations
+
 import os
-import time
-import math
-import numpy as np
-import matplotlib.pyplot as plt
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
 import torch
 
-
-def _ensure_dir(path: str) -> None:
-    os.makedirs(path, exist_ok=True)
+from .grad_operations import jacobian_fro_norm
 
 
-def _timestamp() -> str:
-    return time.strftime("%Y%m%d-%H%M%S")
+@dataclass
+class Viz2DConfig:
+    grid_n: int = 160
+    padding: float = 0.75
+    landmarks: int = 256
+    dpi: int = 160
 
 
-@torch.no_grad()
-def _pca_2d(z: torch.Tensor) -> torch.Tensor:
-    """
-    z: (N, D)
-    returns: (N, 2)
-    PCA via SVD; no sklearn dependency.
-    """
-    z = z.detach()
-    z = z - z.mean(dim=0, keepdim=True)
-    # SVD on covariance equivalent: take top 2 right singular vectors
-    # z = U S V^T -> PC directions = V[:, :2]
-    _, _, Vt = torch.linalg.svd(z, full_matrices=False)
-    pcs = Vt[:2].T  # (D,2)
-    return z @ pcs  # (N,2)
+def _make_2d_grid_from_batch(
+    x_batch: torch.Tensor,
+    grid_n: int,
+    padding: float,
+    device: torch.device,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Create a 2D grid covering the batch extent."""
+    assert x_batch.shape[1] == 2, "2D visualization expects d=2 inputs"
+
+    x_min = x_batch.min(dim=0).values - padding
+    x_max = x_batch.max(dim=0).values + padding
+
+    xs = torch.linspace(x_min[0].item(), x_max[0].item(), grid_n, device=device)
+    ys = torch.linspace(x_min[1].item(), x_max[1].item(), grid_n, device=device)
+    X, Y = torch.meshgrid(xs, ys, indexing="xy")
+    grid = torch.stack([X.reshape(-1), Y.reshape(-1)], dim=1)  # (grid_n^2, 2)
+    return grid, X, Y
 
 
-def _save_scatter(
-    xy: np.ndarray,
-    color: np.ndarray,
-    outpath: str,
-    title: str,
-    cmap: str = "viridis",
-    s: int = 8,
-) -> None:
-    plt.figure()
-    plt.scatter(xy[:, 0], xy[:, 1], c=color, s=s, cmap=cmap)
-    plt.title(title)
-    plt.xlabel("PC1")
-    plt.ylabel("PC2")
-    plt.colorbar()
-    plt.tight_layout()
-    plt.savefig(outpath, dpi=200)
-    plt.close()
-
-
-def _save_scatter_labels(
-    xy: np.ndarray,
-    labels: np.ndarray,
-    outpath: str,
-    title: str,
-    s: int = 8,
-) -> None:
-    plt.figure()
-    plt.scatter(xy[:, 0], xy[:, 1], c=labels, s=s, cmap="tab10")
-    plt.title(title)
-    plt.xlabel("PC1")
-    plt.ylabel("PC2")
-    plt.colorbar()
-    plt.tight_layout()
-    plt.savefig(outpath, dpi=200)
-    plt.close()
-
-
-def _save_hist(values: np.ndarray, outpath: str, title: str, bins: int = 60) -> None:
-    plt.figure()
-    plt.hist(values, bins=bins)
-    plt.title(title)
-    plt.xlabel("value")
-    plt.ylabel("count")
-    plt.tight_layout()
-    plt.savefig(outpath, dpi=200)
-    plt.close()
-
-
-def _save_image_grid(x: torch.Tensor, outpath: str, title: str, n: int = 16) -> None:
-    """
-    x: (B,C,H,W) assumed in [0,1] for display.
-    """
-    x = x[:n].detach().cpu()
-    B, C, H, W = x.shape
-    cols = int(math.sqrt(n))
-    rows = int(math.ceil(n / cols))
-
-    plt.figure(figsize=(cols * 2, rows * 2))
-    for i in range(n):
-        plt.subplot(rows, cols, i + 1)
-        img = x[i]
-        if C == 1:
-            plt.imshow(img[0], cmap="gray", vmin=0.0, vmax=1.0)
-        else:
-            plt.imshow(img.permute(1, 2, 0).clamp(0, 1))
-        plt.axis("off")
-    plt.suptitle(title)
-    plt.tight_layout()
-    plt.savefig(outpath, dpi=200)
-    plt.close()
-
-
-def visualize_representations(
+def visualize_fields_2d(
     *,
-    encoder,
-    poisson_estimator,          # must expose v_and_gradv(zq, zl, g_land) -> (v, gradv)
-    corruption_operator,        # Πψ(x): torch.Tensor -> torch.Tensor
-    dataloader,
-    device: str,
-    outdir: str,
-    z_dim: int,
-    hutchinson_fn,              # hutchinson_fn(encoder, x, z_dim, n_samples, create_graph)->g: (B,)
-    hutchinson_samples: int = 1,
-    n_batches: int = 4,
-    landmarks: int = 128,
-) -> None:
+    model,
+    poisson_reg,
+    projector,
+    x_batch: torch.Tensor,
+    out_dir: str,
+    step: int,
+    device: str | torch.device = "cpu",
+    cfg: Optional[Viz2DConfig] = None,
+) -> str:
+    """Save a 2D visualization of f, ||∇f||, v and ∇v.
+
+    Parameters
+    ----------
+    model:
+        AE_model (must expose model.Encoder)
+    poisson_reg:
+        Poisson_reg instance (must expose Estimate_field_grads)
+    projector:
+        CorruptionOperator (Πψ) returning (x_tilde, t)
+    x_batch:
+        (B,2) batch of data
+    out_dir:
+        directory to save figures
+    step:
+        training step (used in filename)
+
+    Returns
+    -------
+    Path to the saved PNG.
     """
-    Produces:
-      - clean/corrupted image grids
-      - PCA scatter colored by labels
-      - histograms of ||∇f||, v, ||∇v||
-      - PCA scatter colored by v and ||∇v||
-    """
+    cfg = cfg or Viz2DConfig()
+    os.makedirs(out_dir, exist_ok=True)
+    device = torch.device(device)
 
-    _ensure_dir(outdir)
+    # Lazy import to keep core dependencies minimal.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
 
-    encoder.eval()
+    x_batch = x_batch.detach().to(device)
+    grid, X, Y = _make_2d_grid_from_batch(x_batch, cfg.grid_n, cfg.padding, device)
+    grid_req = grid.clone().requires_grad_(True)
 
-    # Collect a small eval set
-    xs, x_tildes, ys = [], [], []
-    for b, batch in enumerate(dataloader):
-        if b >= n_batches:
-            break
-        if isinstance(batch, (list, tuple)) and len(batch) >= 2:
-            x, y = batch[0], batch[1]
-        else:
-            x, y = batch, None
+    # Apply Πψ to get corrupted points (used in Poisson regularizer).
+    x_tilde, _ = projector(grid_req)
 
-        x = x.to(device)
-        x_tilde = corruption_operator(x)
-        xs.append(x)
-        x_tildes.append(x_tilde)
-        if y is not None:
-            ys.append(y.to(device))
+    # f(x): take first 2 dims (if z<2, fall back to repeating)
+    with torch.no_grad():
+        z = model.Encoder(grid_req)
+    if z.shape[1] == 1:
+        f1 = z[:, 0]
+        f2 = torch.zeros_like(f1)
+    else:
+        f1, f2 = z[:, 0], z[:, 1]
+    fnorm = z.norm(dim=1)
 
-    x = torch.cat(xs, dim=0)
-    x_tilde = torch.cat(x_tildes, dim=0)
-    y = torch.cat(ys, dim=0) if len(ys) > 0 else None
+    # ||∇ f(x)||_F on the grid
+    g = jacobian_fro_norm(model.Encoder, grid_req, create_graph=False).detach()
 
-    # Save image grids
-    _save_image_grid(x, os.path.join(outdir, "images_clean.png"), "Clean samples", n=16)
-    _save_image_grid(x_tilde, os.path.join(outdir, "images_corrupted.png"), "Corrupted samples (Pi(x))", n=16)
+    # v(x) and ∇v(x) using the repo's estimator
+    v, gradv = poisson_reg.Estimate_field_grads(grid_req, x_tilde.detach(), landmarks=cfg.landmarks)
+    v = v.detach()
+    gradv = gradv.detach()
 
-    # Latents
-    z = encoder(x)           # f(x)
-    z_tilde = encoder(x_tilde)
+    # Reshape scalars to (grid_n, grid_n)
+    def R(u: torch.Tensor) -> torch.Tensor:
+        return u.reshape(cfg.grid_n, cfg.grid_n).cpu()
 
-    # PCA for visualization
-    xy = _pca_2d(z).cpu().numpy()
-    xy_tilde = _pca_2d(z_tilde).cpu().numpy()
+    v_img = R(v)
+    g_img = R(g)
+    f1_img, f2_img = R(f1), R(f2)
+    fn_img = R(fnorm)
 
-    if y is not None:
-        _save_scatter_labels(xy, y.detach().cpu().numpy(), os.path.join(outdir, "pca_f_x_labels.png"), "PCA of f(x) colored by label")
-        _save_scatter_labels(xy_tilde, y.detach().cpu().numpy(), os.path.join(outdir, "pca_f_xtilde_labels.png"), "PCA of f(Pi(x)) colored by label")
+    # Quiver downsample factor (avoid too many arrows)
+    q = max(1, cfg.grid_n // 25)
+    Xc = X[::q, ::q].cpu()
+    Yc = Y[::q, ::q].cpu()
+    gvx = gradv[:, 0].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
+    gvy = gradv[:, 1].reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
+    f1q = f1.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
+    f2q = f2.reshape(cfg.grid_n, cfg.grid_n)[::q, ::q].cpu()
 
-    # ||∇ f(x)|| (contractive quantity)
-    # We compute it on corrupted inputs as well, because that’s your experimental focus (OOD/corruption).
-    x_land = x_tilde[:min(landmarks, x_tilde.size(0))].clone().requires_grad_(True)
-    g_land = hutchinson_fn(encoder, x_land, z_dim, n_samples=hutchinson_samples, create_graph=True)  # (M,)
-    g_vals = g_land.detach().cpu().numpy()
-    _save_hist(g_vals, os.path.join(outdir, "hist_gradf_norm.png"), r"Histogram of $||\nabla_x f(x)||_F$ on corrupted landmarks")
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8), dpi=cfg.dpi)
+    ax = axes[0, 0]
+    im = ax.contourf(X.cpu(), Y.cpu(), fn_img, levels=40)
+    ax.quiver(Xc, Yc, f1q, f2q, angles="xy", scale_units="xy", scale=None, width=0.002)
+    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
+    ax.set_title("f(x): ||f|| (contour) + first-2 comps (quiver)")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
-    # Poisson v and ∇v in latent space (as in your derivation/implementation)
-    # Use latent landmarks zl and compute v(z_tilde) and gradv(z_tilde).
-    zl = encoder(x_land)  # (M, z_dim)
-    v, gradv = poisson_estimator.v_and_gradv(z_tilde, zl, g_land)  # v:(N,), gradv:(N,z_dim)
+    ax = axes[0, 1]
+    im = ax.contourf(X.cpu(), Y.cpu(), g_img, levels=40)
+    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
+    ax.set_title(r"$||\nabla f(x)||_F$ (contour)")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
-    v_np = v.detach().cpu().numpy()
-    gradv_norm_np = gradv.detach().norm(dim=1).cpu().numpy()
+    ax = axes[1, 0]
+    im = ax.contourf(X.cpu(), Y.cpu(), v_img, levels=40)
+    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
+    ax.set_title("v(x) (Poisson potential; contour)")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
-    _save_hist(v_np, os.path.join(outdir, "hist_v.png"), r"Histogram of $v(x)$ evaluated at $z=f(\Pi(x))$")
-    _save_hist(gradv_norm_np, os.path.join(outdir, "hist_gradv_norm.png"), r"Histogram of $||\nabla v||$ in latent space")
+    ax = axes[1, 1]
+    speed = torch.sqrt(gvx**2 + gvy**2)
+    im = ax.contourf(X.cpu(), Y.cpu(), R(torch.sqrt((gradv**2).sum(dim=1))), levels=40)
+    ax.quiver(Xc, Yc, gvx, gvy, angles="xy", scale_units="xy", scale=None, width=0.002)
+    ax.scatter(x_batch[:, 0].cpu(), x_batch[:, 1].cpu(), s=4, alpha=0.35)
+    ax.set_title(r"$\nabla v(x)$ (quiver) and $||\nabla v||$ (contour)")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
-    # Scatter colored by v and ||∇v||
-    _save_scatter(xy_tilde, v_np, os.path.join(outdir, "pca_f_xtilde_v.png"), r"PCA of $f(\Pi(x))$ colored by $v$")
-    _save_scatter(xy_tilde, gradv_norm_np, os.path.join(outdir, "pca_f_xtilde_gradv.png"), r"PCA of $f(\Pi(x))$ colored by $||\nabla v||$")
+    for ax in axes.reshape(-1):
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_xlabel("x1")
+        ax.set_ylabel("x2")
 
-    print(f"[viz] Saved visualization figures to: {outdir}")
+    fig.suptitle(f"Poisson-CAE fields @ step {step}", y=1.02)
+    fig.tight_layout()
+
+    out_path = os.path.join(out_dir, f"fields_step_{step:06d}.png")
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    return out_path

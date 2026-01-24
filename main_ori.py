@@ -11,7 +11,6 @@ from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
 from Utils.geometry_estimators import PoissonMCConfig
 from Utils.geometry_estimators import PoissonMCEstimator
-from Utils.visualization import visualize_fields_2d, Viz2DConfig
 
 from models import Poisson_reg,AE_model
 
@@ -56,10 +55,9 @@ def train(
     landmarks: int = 256,
     device: str = "cuda",
     steps: int = 5000,
-    viz_every: int = 500,
-    viz_dir: str = "outputs",
 ):
     model.to(device).train()
+    decoder.to(device).train()
     Pi.to(device).train()
     poisson_est.to(device).train()
 
@@ -76,7 +74,7 @@ def train(
             x_tilde, _ = Pi(x)
 
             x_hat = model.forward(x)
-            v, grad_v = PR.Estimate_field_grads(x, x_tilde, landmarks=landmarks)
+            v, grad_v = PR.Estimate_field_grads(x,x_tilde,landmarks = 100)
 
             # CAE reconstruction: reconstruct clean x from corrupted hidden state
             logp = PR.ML_loss(x,x_hat)
@@ -98,22 +96,12 @@ def train(
                       flux={flux.item():.6f}\
                       bulk={bulk.item():.6f}\
                       loss={loss.item():.6f}")
+                
+            # Example: run viz every 5 epochs
+        # inside your epoch loop (after training steps), run viz on one batch
 
-            # Visualize learned fields (2D toy case)
-            if viz_every > 0 and (step % viz_every == 0):
-                try:
-                    _ = visualize_fields_2d(
-                        model=model,
-                        poisson_reg=PR,
-                        projector=Pi,
-                        x_batch=x.detach(),
-                        out_dir=viz_dir,
-                        step=step,
-                        device=device,
-                        cfg=Viz2DConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160),
-                    )
-                except Exception as e:
-                    print(f"[viz] warning: visualization failed at step {step}: {e}")
+
+
             if step >= steps:
                 return x_hat
 
