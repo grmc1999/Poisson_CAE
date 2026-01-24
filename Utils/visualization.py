@@ -21,7 +21,7 @@ from typing import Optional, Tuple
 import torch
 
 from .grad_operations import jacobian_fro_norm
-from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 
 
 @dataclass
@@ -107,8 +107,7 @@ def visualize_fields_2d(
         f2 = torch.zeros_like(f1)
     else:
         f1, f2 = z[:, 0], z[:, 1]
-        T_p = TSNE(n_components=2, learning_rate='auto',
-                  init='random', perplexity=3).fit(z)
+        T_p = PCA(n_components=2).fit(z)
         zp=T_p.transform(z)
         print("z shape")
         print(zp.shape)
