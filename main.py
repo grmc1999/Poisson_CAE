@@ -123,6 +123,18 @@ def train(
 # -----------------------------
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Create a ArcHydro schema')
+    parser.add_argument('--lr', metavar='path', required=True,
+                        help='the path to workspace')
+    parser.add_argument('--lam', metavar='path', required=True,
+                        help='path to schema')
+    parser.add_argument('--landmarks', metavar='path', required=True,
+                        help='path to dem')
+    parser.add_argument('--steps', metavar='path', required=True,
+                        help='path to dem')
+    args = parser.parse_args()
 
     # Toy in-domain data: mixture of Gaussians in R^2
     torch.manual_seed(0)
@@ -155,10 +167,10 @@ if __name__ == "__main__":
         Pi=Pi,
         poisson_est=poisson_est,
         dataloader=loader,
-        lr=1e-3,
-        lam=1e-2,
-        landmarks=256,
+        lr=args.lr,
+        lam=args.lam,
+        landmarks=args.landmarks,
         device=device,
-        steps=1000,
+        steps=args.steps,
     )
 
