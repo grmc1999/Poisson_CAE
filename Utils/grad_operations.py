@@ -35,7 +35,7 @@ def green_reg(x: torch.Tensor, y: torch.Tensor, eps: float = 1e-2) -> torch.Tens
     B, d = x.shape
     r2 = ((x[:, None, :] - y[None, :, :]) ** 2).sum(dim=2)
     #r = torch.sqrt(r2 + eps**2)
-    r = torch.clamp(torch.sqrt(r2 + eps**2),max=10**(32-d-1),min=0)
+    r = torch.clamp(torch.sqrt(r2 + eps**2),max=10**(32-d-1),min=1e-8)
     if d == 2:
         return -(1.0 / (2.0 * math.pi)) * torch.log(r)
     if d >= 3:
@@ -50,7 +50,7 @@ def gradx_green_reg(x: torch.Tensor, y: torch.Tensor, eps: float = 1e-2) -> torc
     B, d = x.shape
     diff = x[:, None, :] - y[None, :, :]
     r2 = (diff ** 2).sum(dim=2)
-    r = torch.clamp(torch.sqrt(r2 + eps**2),max=10**(32-d-1),min=0)
+    r = torch.clamp(torch.sqrt(r2 + eps**2),max=10**(32-d-1),min=1e-8)
     if d == 2:
         # G = -(1/(2π)) log r  => ∇ = -(1/(2π)) diff / (r^2)
         return -(1.0 / (2.0 * math.pi)) * diff / (r2[..., None] + eps**2)
