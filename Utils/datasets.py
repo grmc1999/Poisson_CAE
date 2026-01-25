@@ -137,8 +137,8 @@ def make_breast_cancer(
         x, y, test_size=test_size, random_state=seed, stratify=y
     )
     
-    y_train = np.concatenate((y_train[:,None],1-y_train[:,None]),axis=1).astype(np.float32)
-    y_test = np.concatenate((y_test[:,None],1-y_test[:,None]),axis=1).astype(np.float32)
+    #y_train = np.concatenate((y_train[:,None],1-y_train[:,None]),axis=1).astype(np.float32)
+    #y_test = np.concatenate((y_test[:,None],1-y_test[:,None]),axis=1).astype(np.float32)
     if standardize:
         scaler = StandardScaler()
         x_train = scaler.fit_transform(x_train).astype(np.float32)

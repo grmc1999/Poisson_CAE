@@ -88,8 +88,14 @@ def train(
             v, grad_v = PR.Estimate_field_grads(x, x_tilde, landmarks=landmarks)
 
             logp = PR.ML_loss(y_true, y_pred)
+            print("logp")
+            print(logp)
             flux = PR.BC_loss(x, x_tilde, grad_v)
+            print("flux")
+            print(flux)
             bulk = PR.D_loss(x, y_true, y_pred, grad_v)
+            print("bulk")
+            print(bulk)
 
             loss = logp + lam * (flux + bulk)
 
