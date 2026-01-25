@@ -84,6 +84,7 @@ def train(
 
             # Downstream prediction from corrupted input (CAE-style)
             y_pred = model.forward(x_tilde)
+            
             v, grad_v = PR.Estimate_field_grads(x, x_tilde, landmarks=landmarks)
 
             logp = PR.ML_loss(y_true, y_pred)

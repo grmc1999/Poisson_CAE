@@ -46,25 +46,17 @@ class Poisson_reg(nn.Module):
     def __init__(self,PoissonEstimator,model):
         super().__init__()
         self.PoissonEstimator = PoissonEstimator
-        #self.Encoder = Encoder
-        #self.Decoder = Decoder
         self.model = model
     
     def ML_loss(self, y_true, y_pred):
         return self.model.logp(y_true, y_pred)
         
     def Estimate_field_grads(self,
-        #encoder: nn.Module,
         x_clean: torch.Tensor,
         x_tilde: torch.Tensor,
         landmarks: int = 256,
     ):
         B, d = x_clean.shape
-
-        # Normal induced by corruption map Πψ:
-        # nψ(x) = (Πψ(x) - x) / ||Πψ(x) - x||
-        #delta = x_tilde - x_clean
-        #n = delta / (delta.norm(dim=1, keepdim=True) + 1e-8)  # (B, d)
 
         # Choose landmark points from the corrupted batch (Monte Carlo quadrature set)
         M = min(landmarks, B)
@@ -85,18 +77,14 @@ class Poisson_reg(nn.Module):
                       y_pred: torch.Tensor,
                       gradv: torch.Tensor,
                       ):
-        #z = self.Encoder(x_clean)
         score_value = self.model.score_value(x_clean, y_true, y_pred)
         return torch.tensordot(score_value,gradv,dims=([-1],[-1])).mean()
 
 
     def BC_loss(self,
-        #encoder: nn.Module,
         x_clean: torch.Tensor,
         x_tilde: torch.Tensor,
-        #v: torch.Tensor,
         gradv: torch.Tensor,
-        #landmarks: int = 256,
     ) -> torch.Tensor:
         """
         x_clean: (B, d)

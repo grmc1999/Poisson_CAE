@@ -27,6 +27,7 @@ try:
     from sklearn.datasets import make_moons, make_circles, load_breast_cancer
     from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import StandardScaler
+    from sklearn.preprocessing import LabelEncoder
 except Exception:  # pragma: no cover
     make_moons = make_circles = load_breast_cancer = None
     train_test_split = None
@@ -135,6 +136,11 @@ def make_breast_cancer(
     x_train, x_test, y_train, y_test = train_test_split(
         x, y, test_size=test_size, random_state=seed, stratify=y
     )
+    label_encoder = LabelEncoder()
+    label_encoder.fit(y_train)
+
+    y_train = label_encoder.transform(y_train)
+    y_test = label_encoder.transform(y_test)
     if standardize:
         scaler = StandardScaler()
         x_train = scaler.fit_transform(x_train).astype(np.float32)
