@@ -148,10 +148,11 @@ class Classifier_model(AE_base_model):
         super().__init__(Encoder, nn.Identity())
         # infer z dim by a lazy linear
         self.head = nn.LazyLinear(n_classes)
+        self.act = nn.Softmax(dim=1)
 
     def forward(self, x):
         z = self.Encoder(x)
-        return self.head(z)  # logits
+        return self.act(self.head(z))  # logits
 
     def logp(self, y_true, y_pred):
         # y_true: (B,) int64 labels, y_pred: (B,C) logits
