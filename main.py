@@ -221,7 +221,7 @@ if __name__ == "__main__":
                 y_pred = model(x)
                 if task == 'classification':
                     pred = y_pred.argmax(dim=1)
-                    correct += (pred == y).sum().item()
+                    correct += (pred == y.argmax(dim=1)).sum().item()
                     total += y.numel()
                 elif task == 'regression':
                     mse += ((y_pred - y) ** 2).mean().item()
