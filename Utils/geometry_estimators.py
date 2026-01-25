@@ -26,9 +26,7 @@ class PoissonMCEstimator(nn.Module):
         denom = float(M)
 
         G = green_reg(x_query, x_land, eps=self.cfg.eps)              # (B, M)
-        print("G",G)
         dG = gradx_green_reg(x_query, x_land, eps=self.cfg.eps)       # (B, M, d)
-        print("dG",dG)
 
         v_hat = (G * g_land[None, :]).sum(dim=1) / denom              # (B,)
         gradv_hat = (dG * g_land[None, :, None]).sum(dim=1) / denom   # (B, d)
