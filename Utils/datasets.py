@@ -136,11 +136,9 @@ def make_breast_cancer(
     x_train, x_test, y_train, y_test = train_test_split(
         x, y, test_size=test_size, random_state=seed, stratify=y
     )
-    label_encoder = LabelEncoder()
-    label_encoder.fit(y_train)
-
-    y_train = label_encoder.transform(y_train)
-    y_test = label_encoder.transform(y_test)
+    
+    y_train = np.concatenate((y_train[:,None],1-y_train[:,None]),axis=1)
+    y_test = np.concatenate((y_test[:,None],1-y_test[:,None]),axis=1)
     if standardize:
         scaler = StandardScaler()
         x_train = scaler.fit_transform(x_train).astype(np.float32)
