@@ -82,7 +82,7 @@ def train(
 
             # Corrupt / OOD via Πψ
             x_tilde, _ = Pi(x)
-
+            print("x",x_tilde)
             # Downstream prediction from corrupted input (CAE-style)
             y_pred = model.forward(x_tilde)
             print(y_pred,y_true)
@@ -91,6 +91,7 @@ def train(
             logp = PR.ML_loss(y_true, y_pred)
             print("logp")
             print(logp)
+            print("grad_v",grad_v)
             flux = PR.BC_loss(x, x_tilde, grad_v)
             print("flux")
             print(flux)
