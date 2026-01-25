@@ -61,8 +61,8 @@ def train(
     viz_dir: str = "outputs",
 ):
     model.to(device).train()
-    Pi.to(device).train()
-    poisson_est.to(device).train()
+    Pi.to(device).eval()
+    poisson_est.to(device).eval()
 
     opt = torch.optim.Adam(list(model.parameters()), lr=lr)
 
