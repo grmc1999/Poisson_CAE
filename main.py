@@ -77,27 +77,17 @@ def train(
             else:
                 x, y_true = batch
             x = x.to(device).requires_grad_(True)
-            print("x",x)
             y_true = y_true.to(device)
 
             # Corrupt / OOD via Πψ
             x_tilde, _ = Pi(x)
-            print("x",x_tilde)
             # Downstream prediction from corrupted input (CAE-style)
             y_pred = model.forward(x_tilde)
-            print(y_pred,y_true)
             v, grad_v = PR.Estimate_field_grads(x, x_tilde, landmarks=landmarks)
 
             logp = PR.ML_loss(y_true, y_pred)
-            print("logp")
-            print(logp)
-            print("grad_v",grad_v)
             flux = PR.BC_loss(x, x_tilde, grad_v)
-            print("flux")
-            print(flux)
             bulk = PR.D_loss(x, y_true, y_pred, grad_v)
-            print("bulk")
-            print(bulk)
 
             loss = logp + lam * (flux + bulk)
 
