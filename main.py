@@ -77,6 +77,7 @@ def train(
             else:
                 x, y_true = batch
             x = x.to(device).requires_grad_(True)
+            print("x",x)
             y_true = y_true.to(device)
 
             # Corrupt / OOD via Πψ
