@@ -39,7 +39,7 @@ def _make_2d_grid_from_batch(
     device: torch.device,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Create a 2D grid covering the batch extent."""
-    assert x_batch.shape[1] == 2, "2D visualization expects d=2 inputs"
+    #assert x_batch.shape[1] == 2, "2D visualization expects d=2 inputs"
     if x_batch.shape[1] != 2:
         x_batch = PCA(n_components=2).fit_transform(x_batch)
 
