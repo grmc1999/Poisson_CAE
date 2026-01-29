@@ -11,7 +11,7 @@ from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
 from Utils.geometry_estimators import PoissonMCConfig
 from Utils.geometry_estimators import PoissonMCEstimator
-from Utils.visualization import visualize_fields_2d, Viz2DConfig
+from Utils.visualization import visualize_fields, VizConfig
 
 from models import Poisson_reg, AE_model, Classifier_model, Regressor_model, GRUEncoder
 from Utils.datasets import get_experiment_loaders, LoaderCfg
