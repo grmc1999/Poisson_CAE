@@ -89,7 +89,7 @@ def train(
             flux = PR.BC_loss(x, x_tilde, grad_v)
             bulk = PR.D_loss(x, y_true, y_pred, grad_v)
 
-            loss = logp + lam * (flux + bulk)
+            loss = logp + lam * (flux - bulk)
 
             opt.zero_grad(set_to_none=True)
             loss.backward()
