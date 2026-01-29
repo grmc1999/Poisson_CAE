@@ -106,7 +106,7 @@ def train(
             if viz_every > 0 and (step % viz_every == 0):
                 # Only meaningful for 2D inputs
                 try:
-                    _ = visualize_fields_2d(
+                    _ = visualize_fields(
                         model=model,
                         poisson_reg=PR,
                         projector=Pi,
@@ -114,7 +114,7 @@ def train(
                         out_dir=viz_dir,
                         step=step,
                         device=device,
-                        cfg=Viz2DConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160),
+                        cfg=VizConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160),
                     )
                 except Exception as e:
                     print(f"[viz] warning: visualization failed at step {step}: {e}")
