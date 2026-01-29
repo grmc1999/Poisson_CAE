@@ -41,8 +41,8 @@ def _make_2d_grid_from_batch(
     """Create a 2D grid covering the batch extent."""
     assert x_batch.shape[1] == 2, "2D visualization expects d=2 inputs"
 
-    x_min = x_batch.min(dim=0) - padding
-    x_max = x_batch.max(dim=0) + padding
+    x_min = x_batch.min(dim=0).values - padding
+    x_max = x_batch.max(dim=0).values + padding
 
     xs = torch.linspace(x_min[0].item(), x_max[0].item(), grid_n, device=device)
     ys = torch.linspace(x_min[1].item(), x_max[1].item(), grid_n, device=device)
