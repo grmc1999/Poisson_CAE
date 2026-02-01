@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from Utils.grad_operations import *
 from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
+from Utils.projectors import fgsm_perturb
 from Utils.geometry_estimators import PoissonMCConfig
 from Utils.geometry_estimators import PoissonMCEstimator
 from Utils.visualization import visualize_fields, VizConfig
@@ -51,6 +52,7 @@ def train(
     Pi: CorruptionOperator,
     poisson_est: PoissonMCEstimator,
     dataloader: DataLoader,
+    task: str,
     *,
     lr: float = 1e-3,
     lam: float = 1e-2,
@@ -61,8 +63,8 @@ def train(
     viz_dir: str = "outputs",
 ):
     model.to(device).train()
-    Pi.to(device).eval()
-    poisson_est.to(device).eval()
+    Pi.to(device).train()
+    poisson_est.to(device).train()
 
     opt = torch.optim.Adam(list(model.parameters()), lr=lr)
 
@@ -80,7 +82,11 @@ def train(
             y_true = y_true.to(device)
 
             # Corrupt / OOD via Πψ
-            x_tilde, _ = Pi(x)
+            if Pi.cfg.mode == "fgsm":
+                x_tilde = fgsm_perturb(model, x, y_true, eps=Pi.cfg.fgsm_eps, task=task)
+            else:
+                x_tilde, _ = Pi(x)
+
             # Downstream prediction from corrupted input (CAE-style)
             y_pred = model.forward(x_tilde)
             v, grad_v = PR.Estimate_field_grads(x, x_tilde, landmarks=landmarks)
@@ -89,7 +95,7 @@ def train(
             flux = PR.BC_loss(x, x_tilde, grad_v)
             bulk = PR.D_loss(x, y_true, y_pred, grad_v)
 
-            loss = logp + lam * (flux - bulk)
+            loss = logp + lam * (flux + bulk)
 
             opt.zero_grad(set_to_none=True)
             loss.backward()
@@ -102,9 +108,8 @@ def train(
                     f"flux={flux.item():.6f} bulk={bulk.item():.6f} loss={loss.item():.6f}"
                 )
 
-            # Visualize learned fields (2D toy case)
+            # Visualize learned fields
             if viz_every > 0 and (step % viz_every == 0):
-                # Only meaningful for 2D inputs
                 try:
                     _ = visualize_fields(
                         model=model,
@@ -143,6 +148,16 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--encoder_type', type=str, default='mlp', choices=['mlp','gru'],
                         help='Encoder type (use gru for sinusoid_reg time-series)')
+    parser.add_argument('--corruption', type=str, default='gaussian',
+                        choices=['gaussian','rotate','zoom','mask','time_shift','fgsm','shift_scale','ddpm','mixture'],
+                        help='Perturbation / projection operator Πψ')
+    parser.add_argument('--sigma', type=float, default=0.1, help='Gaussian noise std for corruption=gaussian')
+    parser.add_argument('--rot_max_deg', type=float, default=30.0, help='Max rotation angle (deg) for corruption=rotate')
+    parser.add_argument('--zoom_min', type=float, default=0.9, help='Min zoom factor for corruption=zoom')
+    parser.add_argument('--zoom_max', type=float, default=1.1, help='Max zoom factor for corruption=zoom')
+    parser.add_argument('--mask_prob', type=float, default=0.1, help='Mask probability for corruption=mask (zeros coordinates)')
+    parser.add_argument('--time_shift_max', type=int, default=5, help='Max shift for corruption=time_shift (roll)')
+    parser.add_argument('--fgsm_eps', type=float, default=0.05, help='FGSM epsilon for corruption=fgsm')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -166,7 +181,19 @@ if __name__ == "__main__":
         )
 
     # Corruption operator Πψ
-    Pi = CorruptionOperator(CorruptionConfig(mode="gaussian", T=200, beta_start=1e-4, beta_end=2e-2))
+    Pi = CorruptionOperator(CorruptionConfig(
+        mode=args.corruption,
+        sigma=args.sigma,
+        rot_max_deg=args.rot_max_deg,
+        zoom_min=args.zoom_min,
+        zoom_max=args.zoom_max,
+        mask_prob=args.mask_prob,
+        time_shift_max=args.time_shift_max,
+        fgsm_eps=args.fgsm_eps,
+        T=200,
+        beta_start=1e-4,
+        beta_end=2e-2,
+    ))
 
     # Poisson Monte Carlo estimator
     poisson_est = PoissonMCEstimator(PoissonMCConfig(eps=1e-2, landmarks=args.landmarks))
@@ -196,6 +223,7 @@ if __name__ == "__main__":
         Pi=Pi,
         poisson_est=poisson_est,
         dataloader=loader,
+        task=task,
         lr=args.lr,
         lam=args.lam,
         landmarks=args.landmarks,
