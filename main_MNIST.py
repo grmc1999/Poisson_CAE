@@ -16,7 +16,7 @@ from Utils.projectors import CorruptionOperator
 from Utils.projectors import CorruptionConfig
 from Utils.geometry_estimators import PoissonMCConfig
 from Utils.geometry_estimators import PoissonMCEstimator
-from Utils.visualization import visualize_fields_2d, Viz2DConfig, visualize_mnist_fields, VizImageConfig
+from Utils.visualization import visualize_fields, VizConfig
 
 from models import Poisson_reg,AE_model
 
@@ -104,18 +104,21 @@ def train(
                       bulk={bulk.item():.6f}\
                       loss={loss.item():.6f}")
 
-            # Visualize learned fields (2D toy case)
+            # Visualize learned fields (works for 2D and higher-D)
             if viz_every > 0 and (step % viz_every == 0):
                 try:
-                    _ = visualize_fields_2d(
+                    xb = x.detach()
+                    if xb.dim() > 2:
+                        xb = xb.view(xb.size(0), -1)
+                    _ = visualize_fields(
                         model=model,
                         poisson_reg=PR,
                         projector=Pi,
-                        x_batch=x.detach(),
+                        x_batch=xb,
                         out_dir=viz_dir,
                         step=step,
                         device=device,
-                        cfg=Viz2DConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160),
+                        cfg=VizConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160),
                     )
                 except Exception as e:
                     print(f"[viz] warning: visualization failed at step {step}: {e}")
@@ -191,18 +194,18 @@ def run_mnist(
 
             if viz_every > 0 and (step % viz_every == 0):
                 try:
-                    # visualize using the same PR + Pi; pass labels for the chosen subset
-                    _ = visualize_mnist_fields(
+                    xb = x.detach()
+                    if xb.dim() > 2:
+                        xb = xb.view(xb.size(0), -1)
+                    _ = visualize_fields(
                         model=model,
                         poisson_reg=PR,
                         projector=Pi,
-                        x_batch_flat=x.detach(),
-                        x_shape=(1, 28, 28),
-                        labels=y.detach(),
+                        x_batch=xb,
                         out_dir=viz_dir,
                         step=step,
                         device=device,
-                        cfg=VizImageConfig(num_images=8, landmarks=landmarks, dpi=160),
+                        cfg=VizConfig(landmarks=landmarks, dpi=160),
                     )
                 except Exception as e:
                     print(f"[mnist-viz] warning: {e}")
