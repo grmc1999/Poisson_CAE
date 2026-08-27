@@ -11,19 +11,19 @@ Tiny Paper) into a main-track submission.
 
 ## Phase 0 — Cleanup & infrastructure (Aug 24–30)
 
-- [ ] Move broken/stale entry points to `legacy/`: `main_ori.py`, `main_MNIST.py`,
+- [x] Move broken/stale entry points to `legacy/`: `main_ori.py`, `main_MNIST.py`,
       `main_flat_mnist.py`, `main_conv_mnist.py` (reference deleted classes/APIs;
       recoverable from git history on `images` branch)
-- [ ] Add `README.md`: theory recap (Poisson reformulation of CAE penalty, Green's identity
+- [x] Add `README.md`: theory recap (Poisson reformulation of CAE penalty, Green's identity
       decomposition), repo layout, usage
-- [ ] Add `requirements.txt` (pinned torch/numpy/scikit-learn/matplotlib) + Python version
-- [ ] Config-driven runs: YAML per experiment, fixed seeds; every run writes config + metrics
+- [x] Add `requirements.txt` (pinned torch/numpy/scikit-learn/matplotlib) + Python version
+- [x] Config-driven runs: YAML per experiment, fixed seeds; every run writes config + metrics
       to `results/<exp>/<timestamp>/` (JSON/CSV)
-- [ ] CPU unit tests (`pytest`):
+- [x] CPU unit tests (`pytest`):
   - `green_reg` / `gradx_green_reg` vs finite differences
   - MC Green estimator vs analytic Poisson solution (e.g., Gaussian blob source)
   - Jacobian Frobenius norm correctness
-- [ ] Merge validated `image_branch` → `main`
+- [x] Merge validated `image_branch` → `main`
 
 ## Phase 1 — Localized Poisson estimators (Aug 31–Sep 6)
 
