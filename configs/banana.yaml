@@ -1,0 +1,24 @@
+# Banana (two-moons) classification experiment.
+data:
+  experiment: banana
+  batch_size: 256
+  seed: 0
+  encoder_type: mlp
+
+model:
+  hidden: 128
+  z_dim: 32
+
+train:
+  lr: 1.0e-3
+  lam: 1.0e-2
+  landmarks: 256
+  steps: 5000
+  viz_every: 500
+  viz_dir: outputs
+  corruption_mode: gaussian
+  corruption_T: 200
+  corruption_beta_start: 0.0001
+  corruption_beta_end: 0.02
+  corruption_sigma: 0.1
+  poisson_eps: 0.01

@@ -1,0 +1,21 @@
+# Breast cancer Wisconsin (30D) classification experiment.
+data:
+  experiment: breast_cancer
+  batch_size: 256
+  seed: 0
+  encoder_type: mlp
+
+model:
+  hidden: 128
+  z_dim: 32
+
+train:
+  lr: 1.0e-3
+  lam: 1.0e-2
+  landmarks: 128
+  steps: 3000
+  viz_every: 500
+  viz_dir: outputs
+  corruption_mode: gaussian
+  corruption_sigma: 0.1
+  poisson_eps: 0.01

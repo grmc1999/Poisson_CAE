@@ -2,3 +2,8 @@
 *.swp
 *.swo
 *.pyc
+__pycache__/
+.pytest_cache/
+results/
+outputs/
+data/

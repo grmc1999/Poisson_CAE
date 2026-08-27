@@ -1,0 +1,21 @@
+# Sinusoid parameter regression (50D time-series). GRU encoder.
+data:
+  experiment: sinusoid_reg
+  batch_size: 256
+  seed: 0
+  encoder_type: gru
+
+model:
+  hidden: 64
+  z_dim: 32
+
+train:
+  lr: 1.0e-3
+  lam: 1.0e-2
+  landmarks: 256
+  steps: 4000
+  viz_every: 500
+  viz_dir: outputs
+  corruption_mode: gaussian
+  corruption_sigma: 0.05
+  poisson_eps: 0.01
