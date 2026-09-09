@@ -57,4 +57,26 @@ def gradx_green_reg(x: torch.Tensor, y: torch.Tensor, eps: float = 1e-2) -> torc
     if d >= 3:
         c = 1.0 / ((d - 2.0) * omega_d(d))
         return c * (2.0 - d) * diff * (r[..., None] ** (-d))
-    raise ValueError("d must be >=2") 
+    raise ValueError("d must be >=2")
+
+
+# ============================= Diffusion kernel =============================
+def diffusion_reg(x: torch.Tensor, y: torch.Tensor, t: float = 1.0) -> torch.Tensor:
+    """Heat/diffusion Green's function G_t(x, y): (B, d) x (M, d) -> (B, M).
+
+    G_t(x,y) = exp(-||x-y||^2 / (4t))  (unnormalized; the scalar prefactor
+    (4*pi*t)^{-d/2} is a global scale that we drop here and fold into lambda).
+    """
+    r2 = ((x[:, None, :] - y[None, :, :]) ** 2).sum(dim=2)   # (B, M)
+    return torch.exp(-r2 / (4.0 * max(t, 1e-12)))
+
+
+def gradx_diffusion_reg(x: torch.Tensor, y: torch.Tensor, t: float = 1.0) -> torch.Tensor:
+    """Gradient of diffusion kernel w.r.t. x: (B, d) x (M, d) -> (B, M, d).
+
+    nabla_x G_t(x,y) = -(x - y)/(2t) * G_t(x,y).
+    """
+    diff = x[:, None, :] - y[None, :, :]                     # (B, M, d)
+    r2 = (diff ** 2).sum(dim=2)                               # (B, M)
+    G = torch.exp(-r2 / (4.0 * max(t, 1e-12)))               # (B, M)
+    return -(diff / (2.0 * max(t, 1e-12))) * G[:, :, None]   # (B, M, d)
