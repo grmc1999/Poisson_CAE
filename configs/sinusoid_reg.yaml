@@ -18,4 +18,11 @@ train:
   viz_dir: outputs
   corruption_mode: gaussian
   corruption_sigma: 0.05
-  poisson_eps: 0.01
+
+estimator:
+  scheme: knn
+  kernel_type: diffusion
+  t: 12.5
+  eps: 1.0e-2
+  k: 32
+  normalize: true

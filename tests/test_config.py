@@ -88,3 +88,53 @@ def test_apply_overrides_type_coercion_string():
     cfg = apply_overrides(cfg, {"data.experiment": "rings"})
     assert cfg.data.experiment == "rings"
     assert isinstance(cfg.data.experiment, str)
+
+
+def test_estimator_block_parse_and_defaults(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+data:
+  experiment: mnist_flat
+estimator:
+  scheme: knn
+  kernel_type: diffusion
+  t: 196.0
+  k: 64
+""",
+    )
+    cfg = load_config(p)
+    assert cfg.estimator.scheme == "knn"
+    assert cfg.estimator.kernel_type == "diffusion"
+    assert cfg.estimator.t == pytest.approx(196.0)
+    assert cfg.estimator.k == 64
+    # unset fields fall back to defaults
+    assert cfg.estimator.eps == pytest.approx(1e-2)
+    assert cfg.estimator.inner_steps == 5
+    # roundtrip
+    d = to_dict(cfg)
+    assert d["estimator"]["k"] == 64
+    assert d["estimator"]["scheme"] == "knn"
+
+
+def test_estimator_block_defaults_global_poisson():
+    cfg = ExperimentConfig()
+    assert cfg.estimator.scheme == "global"
+    assert cfg.estimator.kernel_type == "poisson"
+
+
+def test_apply_overrides_estimator_keys():
+    cfg = ExperimentConfig()
+    cfg = apply_overrides(
+        cfg,
+        {
+            "estimator.scheme": "compact",
+            "estimator.t": "7.5",
+            "estimator.max_neighbors": "48",
+            "estimator.inner_lr": "1e-3",
+        },
+    )
+    assert cfg.estimator.scheme == "compact"
+    assert cfg.estimator.t == pytest.approx(7.5)
+    assert cfg.estimator.max_neighbors == 48
+    assert cfg.estimator.inner_lr == pytest.approx(1e-3)

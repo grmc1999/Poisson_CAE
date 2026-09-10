@@ -21,4 +21,12 @@ train:
   corruption_beta_start: 0.0001
   corruption_beta_end: 0.02
   corruption_sigma: 0.1
-  poisson_eps: 0.01
+
+estimator:
+  scheme: compact
+  kernel_type: diffusion
+  t: 0.25
+  eps: 1.0e-2
+  radius: 2.0
+  max_neighbors: 64
+  normalize: true

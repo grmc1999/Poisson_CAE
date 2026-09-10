@@ -25,7 +25,7 @@ from Utils.config import (
     save_config,
 )
 from Utils.datasets import LoaderCfg, get_experiment_loaders
-from Utils.geometry_estimators import PoissonMCConfig, PoissonMCEstimator
+from Utils.estimator_factory import build_estimator
 from Utils.projectors import CorruptionConfig, CorruptionOperator
 
 from models import (
@@ -101,10 +101,8 @@ def build_pipeline(cfg: ExperimentConfig, device: str):
         )
     )
 
-    # Poisson estimator
-    poisson_est = PoissonMCEstimator(
-        PoissonMCConfig(eps=cfg.train.poisson_eps, landmarks=cfg.train.landmarks)
-    )
+    # Potential estimator (scheme / kernel_type / t from cfg.estimator)
+    estimator = build_estimator(cfg.estimator, d=input_dim)
 
     # Reuse main.py's training loop
     from main import train
@@ -112,7 +110,7 @@ def build_pipeline(cfg: ExperimentConfig, device: str):
     train(
         model=model,
         Pi=Pi,
-        poisson_est=poisson_est,
+        poisson_est=estimator,
         dataloader=loader,
         lr=cfg.train.lr,
         lam=cfg.train.lam,
@@ -137,11 +135,16 @@ def evaluate(model, test_loader, task, device):
     mse = 0.0
     with torch.no_grad():
         for batch in test_loader:
-            x, y = batch
-            x = x.to(device)
-            y = y.to(device)
+            x, y = batch[0].to(device), (batch[1] if len(batch) > 1 else None)
+            if task == "reconstruction":
+                # y is absent / irrelevant: compare reconstruction to clean input.
+                mse += ((model(x) - x) ** 2).mean().item()
+                total += 1
+                continue
             y_pred = model(x)
             if task == "classification":
+                if y is None:
+                    raise ValueError("classification test loader must provide labels")
                 pred = y_pred.argmax(dim=1)
                 correct += (pred == y).sum().item()
                 total += y.numel()
@@ -150,7 +153,7 @@ def evaluate(model, test_loader, task, device):
                 total += 1
     if task == "classification":
         metrics = {"accuracy": correct / float(total), "correct": correct, "total": total}
-    elif task == "regression":
+    elif task in ("regression", "reconstruction"):
         metrics = {"mse": mse / float(total)}
     else:
         metrics = {}
@@ -162,12 +165,11 @@ def parse_args(argv):
     ap.add_argument("--config", type=str, required=True, help="Path to YAML config")
     ap.add_argument("--out", type=str, default=None, help="Override results dir")
     ap.add_argument("--device", type=str, default=None, help="cuda/cpu")
-    ap.add_argument(
-        "overrides",
-        nargs=argparse.REMAINDER,
-        help="Dotted-path overrides, e.g. --train.lam 5e-3 --data.seed 1",
-    )
-    return ap.parse_args(argv)
+    # Everything after the known options are dotted-path overrides that argparse
+    # would otherwise reject, e.g. --train.lam 5e-3 --data.seed=1.
+    args, extras = ap.parse_known_args(argv)
+    args.overrides = extras
+    return args
 
 
 def main(argv=None):
@@ -175,13 +177,21 @@ def main(argv=None):
     cfg = load_config(args.config)
 
     overrides = {}
+    tokens = list(args.overrides)
     i = 0
-    while i < len(args.overrides):
-        if not args.overrides[i].startswith("--"):
+    while i < len(tokens):
+        tok = tokens[i]
+        if not tok.startswith("--"):
             i += 1
             continue
-        key = args.overrides[i][2:]
-        val = args.overrides[i + 1] if i + 1 < len(args.overrides) else "True"
+        body = tok[2:]
+        if "=" in body:
+            key, val = body.split("=", 1)
+            overrides[key] = val
+            i += 1
+            continue
+        key = body
+        val = tokens[i + 1] if i + 1 < len(tokens) else "True"
         overrides[key] = val
         i += 2
     apply_overrides(cfg, overrides)

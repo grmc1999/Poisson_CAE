@@ -177,12 +177,51 @@ def make_sinusoid_params_regression(
     return torch.from_numpy(x), torch.from_numpy(y)
 
 
+# -----------------------------
+# MNIST (flat, reconstruction in pixel space, d=784)
+# -----------------------------
+def get_mnist_flat_loaders(
+    cfg: LoaderCfg,
+    root: str = "./data",
+) -> Tuple[DataLoader, DataLoader, int, str]:
+    """MNIST flattened to 784-d pixel vectors.
+
+    Requires torchvision (available on the cluster). Raises a clear error if
+    torchvision is missing so local CPU smoke tests can skip it.
+    """
+    try:
+        from torchvision import datasets, transforms
+    except ImportError as e:  # pragma: no cover
+        raise RuntimeError(
+            "torchvision is required for the 'mnist_flat' experiment. "
+            "Install it with: pip install torchvision"
+        ) from e
+
+    tfm = transforms.ToTensor()
+    train_ds = datasets.MNIST(root, train=True, download=True, transform=tfm)
+    test_ds = datasets.MNIST(root, train=False, download=True, transform=tfm)
+
+    def _pack(ds) -> Tuple[torch.Tensor, torch.Tensor]:
+        x = torch.stack([t[0] for t in ds]).view(len(ds), -1)  # (N, 784) in [0,1]
+        y = torch.tensor([t[1] for t in ds], dtype=torch.long)
+        return x, y
+
+    tr = _to_loader(*_pack(train_ds), cfg)
+    te = _to_loader(
+        *_pack(test_ds),
+        LoaderCfg(batch_size=cfg.batch_size, shuffle=False, drop_last=False,
+                  num_workers=cfg.num_workers),
+    )
+    return tr, te, 784, "reconstruction"
+
+
 DatasetName = Literal[
     "spirals",
     "banana",
     "rings",
     "breast_cancer",
     "sinusoid_reg",
+    "mnist_flat",
 ]
 
 
@@ -228,5 +267,7 @@ def get_experiment_loaders(
         tr = _to_loader(xtr, ytr, cfg)
         te = _to_loader(xte, yte, LoaderCfg(batch_size=cfg.batch_size, shuffle=False, drop_last=False))
         return tr, te, x.shape[1], "regression"
+    if name == "mnist_flat":
+        return get_mnist_flat_loaders(cfg)
 
     raise ValueError(f"Unknown experiment name: {name}")

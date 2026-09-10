@@ -1,0 +1,30 @@
+# MNIST flat (d=784) reconstruction in pixel space. Diffusion-kernel estimator.
+# Poisson kernel is infeasible at d=784 (omega_d overflows); the L2-kNN + diffusion
+# kernel keeps gradients finite. t = d/4 heuristic (PLAN.md high-d rule).
+data:
+  experiment: mnist_flat
+  batch_size: 128
+  seed: 0
+  encoder_type: mlp
+
+model:
+  hidden: 512
+  z_dim: 64
+
+train:
+  lr: 2.0e-4
+  lam: 1.0e-2
+  landmarks: 128
+  steps: 3000
+  viz_every: 500
+  viz_dir: outputs
+  corruption_mode: gaussian
+  corruption_sigma: 0.3
+
+estimator:
+  scheme: knn
+  kernel_type: diffusion
+  t: 196.0
+  eps: 1.0e-2
+  k: 64
+  normalize: true

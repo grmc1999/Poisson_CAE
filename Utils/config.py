@@ -68,6 +68,34 @@ class TrainConfig:
 
 
 # -----------------------------
+# Estimator block (Phase 2)
+# -----------------------------
+@dataclass
+class EstimatorConfig:
+    """Which potential solver to use and its hyper-parameters.
+
+    scheme:     global | compact (L1) | knn (L2) | variational (Ritz)
+    kernel_type: poisson | diffusion   (ignored by 'variational')
+    t:            diffusion scale; the kernel is exp(-||x-y||^2/(4t)).
+    """
+    scheme: str = "global"
+    kernel_type: str = "poisson"
+    t: float = 1.0
+    eps: float = 1e-2
+    radius: float = 1.0            # L1 compact-support radius R
+    max_neighbors: int = 64        # L1 gather cap (0 -> all landmarks)
+    k: int = 32                    # L2 kNN neighbours per query
+    normalize: bool = True         # normalize localized quadrature by cardinality/k
+    # variational (Ritz) knobs
+    mu: float = 0.0                # screening mass
+    v_hidden: int = 128            # PotentialHead width
+    v_layers: int = 3              # PotentialHead depth
+    inner_steps: int = 5           # K inner GD steps per outer step
+    inner_lr: float = 1e-2        # inner GD learning rate
+    lam_d: float = 1.0             # Dirichlet soft-penalty weight
+
+
+# -----------------------------
 # Top-level config
 # -----------------------------
 @dataclass
@@ -75,6 +103,7 @@ class ExperimentConfig:
     data: DataConfig = field(default_factory=DataConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
+    estimator: EstimatorConfig = field(default_factory=EstimatorConfig)
     name: str = ""                      # optional experiment label; defaults to data.experiment
 
 
@@ -128,7 +157,7 @@ def _build_config(data: dict[str, Any]) -> ExperimentConfig:
     allowed = {f.name for f in fields(ExperimentConfig)}
     if not isinstance(data, dict):
         raise ValueError("Config root must be a mapping")
-    unknown = set(data) - allowed - {"data", "model", "train"}
+    unknown = set(data) - allowed
     if unknown:
         raise ValueError(f"Unknown top-level config keys: {sorted(unknown)}")
 
@@ -148,6 +177,7 @@ def _build_config(data: dict[str, Any]) -> ExperimentConfig:
         data=_mk("data", DataConfig),
         model=_mk("model", ModelConfig),
         train=_mk("train", TrainConfig),
+        estimator=_mk("estimator", EstimatorConfig),
         name=data.get("name", ""),
     )
 
@@ -171,14 +201,14 @@ def apply_overrides(cfg: ExperimentConfig, overrides: dict[str, str]) -> Experim
     for key, raw in overrides.items():
         # normalize 'data.x' / 'model.x' / 'train.x' keys
         norm_key = key
-        for block in ("data", "model", "train"):
+        for block in ("data", "model", "train", "estimator"):
             if norm_key.startswith(f"{block}."):
                 break
         else:
             raise ValueError(
-                f"Override {key!r} must start with 'data.', 'model.' or 'train.'"
+                f"Override {key!r} must start with 'data.', 'model.', 'train.' or 'estimator.'"
             )
-        container = {"data": cfg.data, "model": cfg.model, "train": cfg.train}[block]
+        container = {"data": cfg.data, "model": cfg.model, "train": cfg.train, "estimator": cfg.estimator}[block]
         fname = norm_key.split(".", 1)[1]
         fobj = next((f for f in fields(container) if f.name == fname), None)
         if fobj is None:
@@ -225,6 +255,7 @@ def to_dict(cfg: ExperimentConfig) -> dict[str, Any]:
         "data": _dataclass_to_dict(cfg.data),
         "model": _dataclass_to_dict(cfg.model),
         "train": _dataclass_to_dict(cfg.train),
+        "estimator": _dataclass_to_dict(cfg.estimator),
     }
 
 

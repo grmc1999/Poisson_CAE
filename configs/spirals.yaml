@@ -1,6 +1,6 @@
-# Breast cancer Wisconsin (30D) classification experiment.
+# Two-spirals classification (2D).
 data:
-  experiment: breast_cancer
+  experiment: spirals
   batch_size: 256
   seed: 0
   encoder_type: mlp
@@ -12,17 +12,18 @@ model:
 train:
   lr: 1.0e-3
   lam: 1.0e-2
-  landmarks: 128
-  steps: 3000
+  landmarks: 256
+  steps: 5000
   viz_every: 500
   viz_dir: outputs
   corruption_mode: gaussian
   corruption_sigma: 0.1
 
 estimator:
-  scheme: knn
+  scheme: compact
   kernel_type: diffusion
-  t: 7.5
+  t: 0.5
   eps: 1.0e-2
-  k: 32
+  radius: 2.5
+  max_neighbors: 64
   normalize: true

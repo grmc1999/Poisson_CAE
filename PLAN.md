@@ -454,18 +454,21 @@ reported in §5 of the paper.
 
 ## Phase 2 — Experiments on cluster (Sep 7–17)
 
-- [ ] SLURM job templates + sweep runner committed to repo; results synced back via git/tarball
-- [ ] Experiment ladder:
-  - Toys: mog / spirals / banana / rings (2D)
-  - Tabular: breast cancer (30D classification)
-  - Time series: sinusoid regression (50D)
-  - Images: MNIST flat + conv (input-space potential)
-- [ ] Baselines: AE, CAE, DAE, VAE
+- [x] SLURM job templates + sweep runner committed to repo; results synced back via git/tarball
+- [x] Experiment ladder (config-driven, `run.py` + `Utils/estimator_factory.py`):
+  - Toys: mog / spirals / banana / rings (2D, compact-support + diffusion)
+  - Tabular: breast cancer (30D, kNN + diffusion; t = d/4 = 7.5)
+  - Time series: sinusoid regression (50D, kNN + diffusion; t = 12.5)
+  - Images: MNIST flat + conv (d=784 input-space potential, kNN + diffusion; t = 196)
+- [ ] Baselines: AE (no corruption), CAE (lam>0), DAE (lam=0), VAE
+      (DAE obtainable as a `train.lam=0` config; AE/VAE need model additions)
 - [ ] Ablations: λ, locality radius R, neighbors k, global-vs-localized estimator,
       corruption mode (gaussian / ddpm / shift_scale),
       diffusion-kernel vs variational (Ritz) potential solver
+      (grid machinery committed via `sweep.py`; sweep submissions pending)
 - [ ] Metrics: task accuracy/MSE under corruption, linear-probe representation quality,
       ‖J_f‖ control, compute scaling curves
+      (accuracy/MSE already recorded per run by `run.py` + `scripts/collect_results.py`)
 
 ## Phase 3 — Paper (Sep 10–25, overlapping)
 
