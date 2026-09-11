@@ -38,7 +38,7 @@ from models import (
 )
 
 
-def build_pipeline(cfg: ExperimentConfig, device: str):
+def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
     """Build and run the full training pipeline for this config.
 
     Returns a metrics dict (task, input_dim, optional test accuracy/MSE).
@@ -107,7 +107,8 @@ def build_pipeline(cfg: ExperimentConfig, device: str):
     # Reuse main.py's training loop
     from main import train
 
-    train(
+    viz_dir = str(run_dir / "viz") if run_dir is not None else cfg.train.viz_dir
+    train_metrics = train(
         model=model,
         Pi=Pi,
         poisson_est=estimator,
@@ -118,12 +119,17 @@ def build_pipeline(cfg: ExperimentConfig, device: str):
         device=device,
         steps=cfg.train.steps,
         viz_every=cfg.train.viz_every,
-        viz_dir=cfg.train.viz_dir,
+        viz_dir=viz_dir,
     )
 
     metrics = {"task": task, "input_dim": input_dim}
+    metrics.update(train_metrics or {})
     if test_loader is not None:
         metrics.update(evaluate(model, test_loader, task, device))
+    if run_dir is not None and (run_dir / "viz").exists():
+        metrics["viz_files"] = len(
+            list((run_dir / "viz").glob("fields_step_*.png"))
+        )
 
     return metrics
 
@@ -201,7 +207,7 @@ def main(argv=None):
     run_dir = run_dir.resolve()
     save_config(cfg, run_dir / "config.yml")
 
-    metrics = build_pipeline(cfg, device)
+    metrics = build_pipeline(cfg, device, run_dir=run_dir)
     metrics["run_id"] = run_dir.name
     metrics_to_json(metrics, run_dir / "metrics.json")
     return metrics

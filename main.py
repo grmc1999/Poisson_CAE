@@ -69,6 +69,7 @@ def train(
     PR = Poisson_reg(poisson_est, model)
 
     step = 0
+    final_metrics: dict = {}
     for epoch in range(10**9):
         for batch in dataloader:
             if len(batch) == 1:
@@ -101,6 +102,15 @@ def train(
                     f"step={step} recon={logp.item():.6f} "
                     f"flux={flux.item():.6f} bulk={bulk.item():.6f} loss={loss.item():.6f}"
                 )
+                final_metrics.update(
+                    {
+                        "final_step": step,
+                        "final_recon": logp.item(),
+                        "final_flux": flux.item(),
+                        "final_bulk": bulk.item(),
+                        "final_loss": loss.item(),
+                    }
+                )
 
             # Visualize learned fields (2D toy case)
             if viz_every > 0 and (step % viz_every == 0):
@@ -119,7 +129,7 @@ def train(
                 except Exception as e:
                     print(f"[viz] warning: visualization failed at step {step}: {e}")
             if step >= steps:
-                return
+                return final_metrics
 
 
 # -----------------------------
