@@ -74,6 +74,11 @@ def render_job(name: str, args_str: str, opts) -> str:
     text = TEMPLATE.read_text(encoding="utf-8")
     for k, v in subs.items():
         text = text.replace(f"__{k}__", v)
+    if not opts.account:
+        text = "\n".join(
+            line for line in text.splitlines()
+            if not line.startswith("#SBATCH --account=")
+        )
     return text
 
 
