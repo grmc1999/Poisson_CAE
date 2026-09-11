@@ -60,6 +60,29 @@ Readings:
   0.0715 (~0.5%). Whether the potential improves robustness vs a plain AE will be
   answered by the `banana_var_lambda` sweep (λ=0 baseline), not yet run.
 
+### Screening sweep — batch 2 (µ ∈ {0.1, 1.0}, seeds {0,1}; jobs 601572–601575, exit 0)
+
+Full screening table (complete):
+
+| µ | seed | recon | flux | bulk | loss | ‖v‖ | ‖∇v‖ |
+|---|---|---|---|---|---|---|---|
+| 0 | 0 | 0.0715 | +3.5e-2 | −9.3e-5 | 0.0719 | 6.94 | 1.76 |
+| 0 | 1 | 0.1133 | −9.3e-3 | −3.4e-4 | 0.1132 | 6.91 | 1.34 |
+| 0.01 | 0 | 0.0715 | +3.7e-2 | −9.5e-5 | 0.0719 | 6.91 | 1.75 |
+| 0.01 | 1 | 0.1133 | −9.3e-3 | −3.4e-4 | 0.1132 | 6.87 | 1.34 |
+| 0.1 | 0 | 0.0715 | +2.8e-2 | −9.6e-5 | 0.0718 | 6.61 | 1.72 |
+| 0.1 | 1 | 0.1133 | −9.4e-3 | −3.3e-4 | 0.1132 | 6.58 | 1.31 |
+| 1.0 | 0 | 0.0715 | +1.6e-2 | −7.6e-5 | 0.0717 | 4.62 | 1.44 |
+| 1.0 | 1 | 0.1133 | −1.3e-2 | −2.8e-4 | 0.1132 | 4.61 | 1.10 |
+
+Conclusions from the screening sweep:
+- **µ compresses the field and quiets the flux**: `‖v‖` 6.94 → 4.62 and
+  flux 3.5e-2 → 1.6e-2 as µ goes 0 → 1 — screening acts as designed (coercivity).
+- **...but loss is flat across µ** (0.0719 → 0.0717; recon pinned at 0.0715 /
+  0.1133). The contractive term is present yet does not move the training
+  objective; the classification/recon term dominates. This makes the λ sweep the
+  decisive test of whether the potential matters at all.
+
 ---
 
 ## Running log
@@ -67,11 +90,10 @@ Readings:
 | # | Sweep | Jobs | State |
 |---|---|---|---|
 | 1 | banana_variational (scheme × seeds) | 601516–601519 | ✔ completed |
-| 2 | banana_var_screening batch 1 (µ 0, 0.01) | 601532–601535 | ✔ completed |
-| 3 | banana_var_screening batch 2 (µ 0.1, 1.0) | pending | – |
-| 4 | banana_var_inner (inner_steps × seeds) | pending | – |
-| 5 | banana_var_lambda (λ × seeds) | pending | – |
-| 6 | banana_var_bc (lam_d × seeds) | pending | – |
+| 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed |
+| 3 | banana_var_inner (inner_steps × seeds) | pending | – |
+| 4 | banana_var_lambda (λ × seeds) | pending | – |
+| 5 | banana_var_bc (lam_d × seeds) | pending | – |
 
 Sweeps generated under `cluster/jobs/banana_var_{screening,inner,lambda,bc}`.
 Submit 4 at a time with `sbatch run_XXXX.sh` from the sweep dir.
