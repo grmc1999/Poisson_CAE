@@ -17,6 +17,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 import math
+from copy import deepcopy
 
 from Utils.geometry_estimators import PoissonMCConfig, PoissonMCEstimator
 from Utils.localized_estimators import (
@@ -349,3 +350,74 @@ def test_variational_energy_decreases_mu_screened():
         energies.append(e.item())
 
     assert energies[-1] < energies[5]
+
+
+def test_variational_bilevel_gradient_reaches_source():
+    """The BOP path must differentiate the field's inner minimizer back into the
+    source g_land (relaxed stop-grad): perturbing one encoder scalar must move the
+    regularizer loss consistently with the analytic gradient. IFT is only exact at
+    inner-stationarity, so the test uses a converged (high-K) inner solve."""
+    from Utils.estimator_factory import build_estimator
+    from Utils.config import EstimatorConfig
+
+    torch.manual_seed(7)
+    d, B, M = 2, 6, 3
+    x = (torch.randn(B, d)).requires_grad_(True)
+    x_tilde = x + 0.2 * torch.randn(B, d)
+    x_land = x_tilde[:M].clone().requires_grad_(True)
+
+    from models import Encoder
+
+    enc = Encoder(d, h=8, z=4)
+
+    # source = ||J_f||_F at landmarks (keeps encoder graph)
+    from Utils.grad_operations import jacobian_fro_norm
+
+    g_land = jacobian_fro_norm(enc, x_land, create_graph=True)
+
+    est = build_estimator(
+        EstimatorConfig(scheme="variational", inner_steps=200, inner_lr=0.1,
+                        v_hidden=4, v_layers=1, lam_d=1.0, mu=0.0, bilevel=True),
+        d=d,
+    )
+    head0 = deepcopy(est.v.state_dict())  # identical inner solve for FD evals
+    v, gradv = est(x_tilde, x_land, g_land)
+
+    # Regularizer: boundary-flux only (encoder touches it solely via the IFT source).
+    norm = (x_tilde - x) / (x_tilde - x).norm(dim=1, keepdim=True).clamp_min(1e-8)
+    reg = (gradv * norm).sum(dim=1).mean()
+    assert reg.requires_grad, "flux must depend on the model (bilevel)"
+    reg.backward()
+
+    i, j = 0, 1
+    ana = enc.net[0].weight.grad[i, j].item()
+
+    eps = 1e-3
+
+    def ev(perturb):
+        enc2 = Encoder(d, h=8, z=4)
+        enc2.load_state_dict(enc.state_dict())
+        deltas = torch.zeros_like(enc2.net[0].weight)
+        deltas[i, j] = perturb
+        with torch.no_grad():
+            enc2.net[0].weight.add_(deltas)
+        x_land2 = x_tilde[:M].clone().requires_grad_(True)
+        g2 = jacobian_fro_norm(enc2, x_land2, create_graph=True)
+        est2 = build_estimator(
+            EstimatorConfig(scheme="variational", inner_steps=200, inner_lr=0.1,
+                            v_hidden=4, v_layers=1, lam_d=1.0, mu=0.0, bilevel=True),
+            d=d,
+        )
+        est2.v.load_state_dict(deepcopy(head0))
+        _, gv2 = est2(x_tilde, x_land2, g2)
+        n2 = (x_tilde - x) / (x_tilde - x).norm(dim=1, keepdim=True).clamp_min(1e-8)
+        return (gv2 * n2).sum(dim=1).mean().item()
+
+    num = (ev(+eps) - ev(-eps)) / (2 * eps)
+    if abs(num) < 1e-9 and abs(ana) < 1e-9:
+        assert True
+    else:
+        assert num * ana > 0, "bilevel gradient sign mismatch"
+        assert abs(num - ana) / max(abs(num), abs(ana), 1e-30) < 0.5, (
+            f"BOP gradient mismatch: analytic={ana:.4e} finite-diff={num:.4e}"
+        )

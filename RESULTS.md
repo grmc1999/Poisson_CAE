@@ -80,8 +80,49 @@ Conclusions from the screening sweep:
   flux 3.5e-2 → 1.6e-2 as µ goes 0 → 1 — screening acts as designed (coercivity).
 - **...but loss is flat across µ** (0.0719 → 0.0717; recon pinned at 0.0715 /
   0.1133). The contractive term is present yet does not move the training
-  objective; the classification/recon term dominates. This makes the λ sweep the
-  decisive test of whether the potential matters at all.
+  objective; the classification/recon term dominates.
+
+### Sep 11 root cause — the regularizer was inert *by construction* (stop-gradient)
+
+**All of the above** (flat µ sweep, byte-identical λ sweep, λ(flux−bulk) ≈ 1e-6)
+is explained by a single implementation fact: the inner field uses
+`s = g_land.detach()` (stop-gradient per PLAN §A.3), so the **flux BC term has
+zero gradient path to the encoder**, and the bulk term couples only through the
+negligible `score_value` term (bulk ≈ −9e-5 — the score is ∥ ∇v on banana, so the
+‖∇v‖² part vanishes). Sweep results therefore cannot discriminate anything about
+the potential: changing λ left trained models byte-identical.
+
+**Fix (implemented, validated locally):** true **bilevel** differentiation
+through the inner solve — `EstimatorConfig.bilevel=True` (default). Implements a
+BOP-style correction `gs = −∇ₛ⟨g,u⟩` with `H·u = b` (H = ∇²E(θ*), E inner energy;
+conjugate-gradient solve), in `Utils/variational_estimator.py`
+(`BOPPoissonSolve`). The old stop-gradient path is kept as `_forward_inert`
+(`bilevel=False`) for the ablation. Two bugs found+fixed along the way: (1) inner
+GD previously ran `energy.backward()` — now `torch.autograd.grad(energy, theta)`
+so inner steps never backprop through `s` into the encoder; (2) the per-param
+vjp merge zeroed the `∇v` vjp whenever the `v` vjp was None — exactly the
+flux-only case — silently zeroing `gs`. PyTorch 2.13 gotcha: custom
+`Function.forward` executes with grad disabled; everything is wrapped in
+`torch.enable_grad()`.
+
+**Validation:**
+
+| check | result |
+|---|---|
+| FD test in `tests/test_localized.py` (all 50 tests pass) | bilevel gradient DFLUX→encoder matches finite-diff (≈4% at K=200, lr=0.1) with correct sign |
+| IFT accuracy vs inner convergence | K=5 ratio −84 (meaningless) → K=200 ≈4% agreement — **need K ≥ ~50** |
+| end-to-end smoke (banana, B=64, K=100, 10 steps, CPU) | clean run, 0.75 s/step |
+
+**Repercussions for the sweep plan:**
+- The µ screening and old λ sweeps are stale under the new mechanism (they tested
+  an inert term) — µ sweep conclusions above stand only as a check of the field
+  geometry, not of the regularizer's effect on training.
+- The λ sweep must be **re-run with bilevel** and a convergence-sufficient K
+  (K=100, lr=0.1 in the generated `banana_var_lambda_bl`; generated locally,
+  regenerated on cluster for correct paths).
+- The inner-GD sweep (now `banana_var_inner_bl`: K ∈ {10, 50, 200}) doubles as
+  the BOP-fidelity curve and sets the default K for every later solver run,
+  including the Phase 2 datasets.
 
 ---
 
@@ -90,10 +131,11 @@ Conclusions from the screening sweep:
 | # | Sweep | Jobs | State |
 |---|---|---|---|
 | 1 | banana_variational (scheme × seeds) | 601516–601519 | ✔ completed |
-| 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed |
-| 3 | banana_var_inner (inner_steps × seeds) | pending | – |
-| 4 | banana_var_lambda (λ × seeds) | pending | – |
+| 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
+| 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | generated, pending |
+| 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | generated, pending |
 | 5 | banana_var_bc (lam_d × seeds) | pending | – |
 
-Sweeps generated under `cluster/jobs/banana_var_{screening,inner,lambda,bc}`.
-Submit 4 at a time with `sbatch run_XXXX.sh` from the sweep dir.
+Sweeps generated via `sweep.py`; submit 4 at a time with `sbatch run_XXXX.sh`
+from the sweep dir (regenerate the dirs *on the cluster* so `REPO` paths are
+correct). Locally: 50/50 tests pass.

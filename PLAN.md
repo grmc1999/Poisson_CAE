@@ -459,12 +459,22 @@ reported in §5 of the paper.
 **Sep 11 finding (banana_variational, 4 runs, exit 0).** The compact-diffusion
 arm explodes: flux ≈ −3.2e3 / −5.4e3, bulk +8.9 / +315, loss ≈ −31 / −54. The
 variational arm is stable: flux ≈ 0, bulk ≈ −1e-4, loss ≈ recon ≈ 0.07 / 0.11.
-**Caveat:** on those runs λ·(flux−bulk) ≈ 1e-6, i.e. the regularizer is
-effectively inert — loss ≈ plain-AE recon. A field with ∇v ≈ 0 at the queried
-points suggests a degenerate (≈0) potential under the current `mu=0` + Dirichlet
-anchoring. Before betting the paper on variational we must (i) record `‖v‖` /
-`‖∇v‖` magnitudes in metrics, (ii) test screening `mu > 0`. Kernel arms are kept
-only as a *tuned* ablation, not an exploding sweep.
+
+**Sep 11 root cause (subsequent).** The regularizer was *inert by construction*,
+not degenerate: the inner field uses the stop-gradient convention
+`s = g_land.detach()` (PLAN §A.3), so the spectral BC loss (flux) has **no** path
+to the encoder, and the bulk loss only couples through the (negligible)
+`score_value` term (bulk ≈ −9e-5; is the score ∥ ∇v on banana). Hence
+λ·(flux−bulk) ≈ 1e-6 no matter the λ — `banana_var_lambda` showed byte-identical
+models. Fix: true **bilevel** differentiation through the inner solve
+(`EstimatorConfig.bilevel=True`, default), BOP-style with an implicit-function /
+conjugate-gradient correction `gs = −∇ₛ⟨g,u⟩`, `H·u = b` (implemented in
+`Utils/variational_estimator.py`; old stop-grad path kept as `_forward_inert`
+ablation). **Constraints:** the IFT correction is only accurate when the inner
+solve is near convergence — at the old defaults (K=5, lr=1e-2) gradients are
+meaningless; use `inner_steps ≥ 50` (K≈100 at lr=0.1 matched FD ≈4%; FD harness
+in `tests/test_localized.py`, 50 tests pass). Kernel arms are kept only as a
+*tuned* ablation, not an exploding sweep.
 
 Every run writes to `results/<exp>/<method-tag>_<timestamp>_<rand>/` containing
 `config.yml`, `metrics.json` (final metrics + method block), `loss_history.json`
@@ -473,12 +483,12 @@ plus `viz/` field plots when `viz_every > 0`. The method tag encodes
 scheme–kernel–(R|k)–t–λ–seed, e.g. `v-d-i5-t0.25-lam0.01-s0` (see
 `Utils/config.py:method_tag`).
 
-| Sweep | focus | overrides (scheme = variational unless noted) | jobs (×seeds 0,1) | status |
+| Sweep | focus | overrides (scheme = variational, bilevel unless noted) | jobs (×seeds 0,1) | status |
 |---|---|---|---|---|
 | banana_variational | solver identity | scheme ∈ {compact, variational}, i=5 | 4 | ✅ done |
-| banana_var_screening | coercivity | mu ∈ {0, 0.01, 0.1, 1} | 8 | todo |
-| banana_var_inner | inner-GD convergence | inner_steps ∈ {1, 5, 20, 50} | 8 | todo |
-| banana_var_lambda | regularizer active? | lam ∈ {0, 1e-3, 1e-2, 1e-1} | 8 | todo |
+| banana_var_screening | coercivity | mu ∈ {0, 0.01, 0.1, 1} (inert era) | 8 | ✅ done |
+| banana_var_inner | inner-GD convergence (BOP fidelity) | inner_steps ∈ {10, 50, 200}, lam=0.01 | 6 | generated (banana_var_inner_bl) |
+| banana_var_lambda | regularizer active? (bilevel) | lam ∈ {0, 1e-3, 1e-2, 1e-1}, K=100, lr=0.1 | 8 | generated (banana_var_lambda_bl) |
 | banana_var_bc | Dirichlet strength | lam_d ∈ {0.1, 1, 10} | 6 | todo |
 | banana_kernel_tuned | kernel ablation | compact + diffusion, tuned {λ, R, t} | TBD | todo |
 
@@ -507,8 +517,11 @@ Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
       completed (4 runs) → **pivot: variational is the primary solver**, kernel = tuned ablation
 - [x] Per-run artifacts: method-tagged run dirs, `metrics.json` + method block,
       `loss_history.json`, `losses_step.png` (Sep 11)
-- [ ] Variational validation: `‖v‖`/`‖∇v‖` probe in metrics + screening `mu` sweep (Phase 1)
-- [ ] Phase 1 sweeps (screening / inner / lambda / bc / kernel_tuned) — submitted via `sweep.py`
+- [x] Root cause of the inert regularizer identified (stop-gradient convention) and
+      **fix implemented**: bilevel/BOP through the inner solve (`bilevel` config,
+      `BOPPoissonSolve` + CG, FD-verified; `test_variational_bilevel_gradient_reaches_source`)
+- [x] Phase 1 sweeps screening (mu) + lambda + inner generated as `banana_var_{screening,inner_bl,lambda_bl}`
+- [ ] Phase 1 sweeps (lambda_bl / inner_bl / bc / kernel_tuned) — submitted via `sweep.py`
 - [ ] Phase 2 datasets (mog, spirals, rings, breast_cancer, sinusoid, MNIST) with winner solver
 - [ ] Baselines: AE (no corruption), CAE (lam>0), DAE (lam=0), VAE
       (DAE obtainable as a `train.lam=0` config; AE/VAE need model additions)

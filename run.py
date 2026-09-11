@@ -302,6 +302,7 @@ def main(argv=None):
             "inner_steps": cfg.estimator.inner_steps,
             "inner_lr": cfg.estimator.inner_lr,
             "lam_d": cfg.estimator.lam_d,
+            "bilevel": cfg.estimator.bilevel,
         }
         if cfg.estimator.scheme == "variational"
         else None,

@@ -93,6 +93,7 @@ class EstimatorConfig:
     inner_steps: int = 5           # K inner GD steps per outer step
     inner_lr: float = 1e-2        # inner GD learning rate
     lam_d: float = 1.0             # Dirichlet soft-penalty weight
+    bilevel: bool = True           # differentiate through the inner solve (BOP)
 
 
 # -----------------------------
