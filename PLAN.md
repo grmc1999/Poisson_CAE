@@ -454,43 +454,62 @@ reported in §5 of the paper.
 
 ## Phase 2 — Experiments on cluster (Sep 7–17)
 
-### Experiment table (79 jobs = 17 ladder + 62 ablation)
+### Phase 1 — method comparison on banana (2D, classification)
+
+**Sep 11 finding (banana_variational, 4 runs, exit 0).** The compact-diffusion
+arm explodes: flux ≈ −3.2e3 / −5.4e3, bulk +8.9 / +315, loss ≈ −31 / −54. The
+variational arm is stable: flux ≈ 0, bulk ≈ −1e-4, loss ≈ recon ≈ 0.07 / 0.11.
+**Caveat:** on those runs λ·(flux−bulk) ≈ 1e-6, i.e. the regularizer is
+effectively inert — loss ≈ plain-AE recon. A field with ∇v ≈ 0 at the queried
+points suggests a degenerate (≈0) potential under the current `mu=0` + Dirichlet
+anchoring. Before betting the paper on variational we must (i) record `‖v‖` /
+`‖∇v‖` magnitudes in metrics, (ii) test screening `mu > 0`. Kernel arms are kept
+only as a *tuned* ablation, not an exploding sweep.
 
 Every run writes to `results/<exp>/<method-tag>_<timestamp>_<rand>/` containing
 `config.yml`, `metrics.json` (final metrics + method block), `loss_history.json`
 (per-step losses) and `losses_step.png` (4-panel loss curves, epoch overlay),
 plus `viz/` field plots when `viz_every > 0`. The method tag encodes
-scheme–kernel–(R|k)–t–λ–seed, e.g. `k-d-k32-t196-lam0.01-s0` (see
+scheme–kernel–(R|k)–t–λ–seed, e.g. `v-d-i5-t0.25-lam0.01-s0` (see
 `Utils/config.py:method_tag`).
 
-| Sweep | dataset | d | task | scheme | kernel | t | R / k | λ | steps | seeds | jobs | status |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| mog_ladder | mog | 2 | recon | compact (L1) | diffusion | 0.5 | R=2.0 | 1e-2 | 5000 | 0,1 | 2 | s0✅ s1~ |
-| spirals_ladder | spirals | 2 | class | compact (L1) | diffusion | 0.5 | R=2.5 | 1e-2 | 5000 | 0,1 | 2 | s0✅ s1~ |
-| banana_ladder | banana | 2 | class | compact (L1) | diffusion | 0.25 | R=2.0 | 1e-2 | 5000 | 0,1 | 2 | s0✅ s1~ |
-| rings_ladder | rings | 2 | class | compact (L1) | diffusion | 0.25 | R=1.5 | 1e-2 | 5000 | 0,1 | 2 | todo |
-| breast_cancer_ladder | breast_cancer | 30 | class | knn (L2) | diffusion | 7.5 | k=32 | 1e-2 | 3000 | 0,1,2 | 3 | todo |
-| sinusoid_ladder | sinusoid_reg | 50 | reg (GRU) | knn (L2) | diffusion | 12.5 | k=32 | 1e-2 | 4000 | 0,1,2 | 3 | todo |
-| mnist_diffusion | mnist_flat | 784 | recon | knn (L2) | diffusion | 196 | k=64 | 1e-2 | 3000 | 0,1,2 | 3 | todo |
-| banana_lambda | banana | 2 | class | compact (L1) | diffusion | 0.25 | R=2.0 | {0,1e-3,3e-3,1e-2,3e-2,1e-1} | 5000 | 0,1 | 12 | todo |
-| banana_radius | banana | 2 | class | compact (L1) | diffusion | 0.25 | R∈{1,1.5,2,2.5,3} | 1e-2 | 5000 | 0,1 | 10 | todo |
-| banana_scheme_poisson | banana | 2 | class | {global,compact,knn} | poisson | 0.25 | – | 1e-2 | 5000 | 0,1 | 6 | todo |
-| banana_kernel | banana | 2 | class | compact (L1) | {poisson,diffusion} | 0.25 | R=2.0 | 1e-2 | 5000 | 0,1 | 4 | todo |
-| banana_variational | banana | 2 | class | {compact,variational} | diffusion | 0.25 | R=2.0 / i=5 | 1e-2 | 5000 | 0,1 | 4 | todo |
-| breast_cancer_k | breast_cancer | 30 | class | knn (L2) | diffusion | 7.5 | k∈{8,16,32,64} | 1e-2 | 3000 | 0,1 | 8 | todo |
-| mnist_k | mnist_flat | 784 | recon | knn (L2) | diffusion | 196 | k∈{16,32,64} | 1e-2 | 3000 | 0,1 | 6 | todo |
-| breast_cancer_corruption | breast_cancer | 30 | class | knn (L2) | diffusion | 7.5 | k=32 | 1e-2 | 3000 | 0,1 | 6 | todo |
-| banana_corruption | banana | 2 | class | compact (L1) | diffusion | 0.25 | R=2.0 | 1e-2 | 5000 | 0,1 | 6 | todo |
+| Sweep | focus | overrides (scheme = variational unless noted) | jobs (×seeds 0,1) | status |
+|---|---|---|---|---|
+| banana_variational | solver identity | scheme ∈ {compact, variational}, i=5 | 4 | ✅ done |
+| banana_var_screening | coercivity | mu ∈ {0, 0.01, 0.1, 1} | 8 | todo |
+| banana_var_inner | inner-GD convergence | inner_steps ∈ {1, 5, 20, 50} | 8 | todo |
+| banana_var_lambda | regularizer active? | lam ∈ {0, 1e-3, 1e-2, 1e-1} | 8 | todo |
+| banana_var_bc | Dirichlet strength | lam_d ∈ {0.1, 1, 10} | 6 | todo |
+| banana_kernel_tuned | kernel ablation | compact + diffusion, tuned {λ, R, t} | TBD | todo |
 
-Corruption-mode sweeps vary `train.corruption_mode ∈ {gaussian, ddpm, shift_scale}`; the
-other sweeps hold it at `gaussian`. `t = d/4` heuristic for tabular/images (MNIST: 196).
+Discontinued (superseded by the finding): banana_lambda / banana_radius /
+banana_scheme_poisson / banana_kernel / banana_corruption sweeps as originally
+scoped; their useful points fold into the tuned kernel-ablation arm.
+
+### Phase 2 — other datasets (winner solver from Phase 1 applied)
+
+Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
+(MNIST: 196). Seeds 0,1 per sweep unless noted.
+
+| Sweep | dataset | d | task | solver | steps | jobs | status |
+|---|---|---|---|---|---|---|---|
+| mog_var | mog | 2 | recon | variational | 5000 | 2 | todo |
+| spirals_var | spirals | 2 | class | variational | 5000 | 2 | todo |
+| rings_var | rings | 2 | class | variational | 5000 | 2 | todo |
+| breast_cancer_var | breast_cancer | 30 | class | variational | 4000 | 2 | todo |
+| sinusoid_var | sinusoid_reg | 50 | reg (GRU) | variational | 4000 | 2 | todo |
+| mnist_var | mnist_flat | 784 | recon | variational | 3000 | 2 | todo |
+| mog/spirals/rings_kernel | toys | 2 | – | tuned kernel arm | 5000 | 2 each | todo |
+| breast_cancer/mnist_kernel | tabular/img | 30/784 | – | tuned kernel arm | 3000 | 2 each | todo |
 
 - [x] SLURM job templates + sweep runner committed to repo; results synced back via git/tarball
-- [x] Experiment ladder (config-driven, `run.py` + `Utils/estimator_factory.py`):
-  - Toys: mog / spirals / banana / rings (2D, compact-support + diffusion)
-  - Tabular: breast cancer (30D, kNN + diffusion; t = d/4 = 7.5)
-  - Time series: sinusoid regression (50D, kNN + diffusion; t = 12.5)
-  - Images: MNIST flat + conv (d=784 input-space potential, kNN + diffusion; t = 196)
+- [x] Variational solver wired end-to-end (`build_estimator` + `run.py`); `banana_variational`
+      completed (4 runs) → **pivot: variational is the primary solver**, kernel = tuned ablation
+- [x] Per-run artifacts: method-tagged run dirs, `metrics.json` + method block,
+      `loss_history.json`, `losses_step.png` (Sep 11)
+- [ ] Variational validation: `‖v‖`/`‖∇v‖` probe in metrics + screening `mu` sweep (Phase 1)
+- [ ] Phase 1 sweeps (screening / inner / lambda / bc / kernel_tuned) — submitted via `sweep.py`
+- [ ] Phase 2 datasets (mog, spirals, rings, breast_cancer, sinusoid, MNIST) with winner solver
 - [ ] Baselines: AE (no corruption), CAE (lam>0), DAE (lam=0), VAE
       (DAE obtainable as a `train.lam=0` config; AE/VAE need model additions)
 - [ ] Ablations: λ, locality radius R, neighbors k, global-vs-localized estimator,
