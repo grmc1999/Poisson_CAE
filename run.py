@@ -108,7 +108,7 @@ def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
     from main import train
 
     viz_dir = str(run_dir / "viz") if run_dir is not None else cfg.train.viz_dir
-    train_metrics = train(
+    train_out = train(
         model=model,
         Pi=Pi,
         poisson_est=estimator,
@@ -120,10 +120,26 @@ def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
         steps=cfg.train.steps,
         viz_every=cfg.train.viz_every,
         viz_dir=viz_dir,
-    )
+    ) or {}
 
     metrics = {"task": task, "input_dim": input_dim}
-    metrics.update(train_metrics or {})
+    metrics.update(train_out.get("final") or {})
+    if run_dir is not None:
+        history = train_out.get("history") or []
+        steps_per_epoch = train_out.get("steps_per_epoch") or 1
+        if history:
+            import json
+
+            from pathlib import Path
+
+            with open(run_dir / "loss_history.json", "w", encoding="utf-8") as fh:
+                json.dump(history, fh, indent=2)
+            metrics["history_points"] = len(history)
+            try:
+                _plot_loss_history(history, steps_per_epoch, str(run_dir / "losses_step.png"))
+                metrics["loss_plot"] = "losses_step.png"
+            except Exception as e:  # plotting must never kill a completed run
+                print(f"[plot] warning: loss plot failed: {e}")
     if test_loader is not None:
         metrics.update(evaluate(model, test_loader, task, device))
     if run_dir is not None and (run_dir / "viz").exists():
@@ -164,6 +180,66 @@ def evaluate(model, test_loader, task, device):
     else:
         metrics = {}
     return metrics
+
+
+def _plot_loss_history(history: list[dict], steps_per_epoch: int, out_png: str) -> None:
+    """Render per-step loss curves with epoch boundaries overlaid.
+
+    4 stacked panels (recon / flux / bulk / total loss) share the training-step
+    x-axis; dashed vertical lines mark each epoch transition and a secondary top
+    axis labels the epoch index (step / steps_per_epoch). Headless-safe (Agg).
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    steps = [h["step"] for h in history]
+    total_steps = max(steps[-1], 1)
+    n_epochs = (total_steps + steps_per_epoch - 1) // steps_per_epoch
+
+    stride = max(1, (n_epochs + 39) // 40)
+    epoch_bounds = [e * steps_per_epoch for e in range(stride, n_epochs + 1, stride)]
+
+    fig, axes = plt.subplots(4, 1, figsize=(9, 12), sharex=True)
+    panels = [
+        ("recon", "reconstruction\n(logp)"),
+        ("flux", "BC flux"),
+        ("bulk", "bulk / D_loss"),
+        ("loss", "total loss"),
+    ]
+    for ax, (key, label) in zip(axes, panels):
+        ax.plot(steps, [h[key] for h in history], lw=0.8)
+        ax.set_ylabel(label, fontsize=10)
+        ax.grid(True, alpha=0.3)
+        for b in epoch_bounds:
+            ax.axvline(b, color="gray", ls="--", lw=0.5, alpha=0.7)
+        if history:
+            v = history[-1][key]
+            ax.annotate(
+                f"{v:.3g}",
+                xy=(steps[-1], v),
+                xytext=(6, 0),
+                textcoords="offset points",
+                fontsize=8,
+                color="tab:red",
+            )
+
+    axes[-1].set_xlabel("training step")
+    for ax in axes[:-1]:
+        ax.set_xticklabels([])
+
+    ax_top = axes[0].secondary_xaxis("top")
+    ax_top.set_xlabel("epoch")
+    top_epochs = sorted({0, n_epochs // 2, n_epochs})
+    top_epochs = [e for e in top_epochs if e * steps_per_epoch <= total_steps]
+    ax_top.set_xticks([e * steps_per_epoch for e in top_epochs])
+    ax_top.set_xticklabels([str(e) for e in top_epochs])
+
+    fig.suptitle("training loss per step", fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.985))
+    fig.savefig(out_png, dpi=150)
+    plt.close(fig)
 
 
 def parse_args(argv):
@@ -209,6 +285,30 @@ def main(argv=None):
 
     metrics = build_pipeline(cfg, device, run_dir=run_dir)
     metrics["run_id"] = run_dir.name
+    metrics["method"] = {
+        "name": cfg.name,
+        "experiment": cfg.data.experiment,
+        "input_dim": metrics.get("input_dim"),
+        "seed": cfg.data.seed,
+        "scheme": cfg.estimator.scheme,
+        "kernel_type": cfg.estimator.kernel_type,
+        "t": cfg.estimator.t,
+        "radius": cfg.estimator.radius,
+        "k": cfg.estimator.k,
+        "max_neighbors": cfg.estimator.max_neighbors,
+        "normalize": cfg.estimator.normalize,
+        "variational": {
+            "mu": cfg.estimator.mu,
+            "inner_steps": cfg.estimator.inner_steps,
+            "inner_lr": cfg.estimator.inner_lr,
+            "lam_d": cfg.estimator.lam_d,
+        }
+        if cfg.estimator.scheme == "variational"
+        else None,
+        "lam": cfg.train.lam,
+        "corruption": cfg.train.corruption_mode,
+        "steps": cfg.train.steps,
+    }
     metrics_to_json(metrics, run_dir / "metrics.json")
     return metrics
 

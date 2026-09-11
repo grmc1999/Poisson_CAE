@@ -70,6 +70,7 @@ def train(
 
     step = 0
     final_metrics: dict = {}
+    history: list[dict] = []
     for epoch in range(10**9):
         for batch in dataloader:
             if len(batch) == 1:
@@ -97,6 +98,16 @@ def train(
             opt.step()
 
             step += 1
+            history.append(
+                {
+                    "step": step,
+                    "epoch": epoch,
+                    "recon": logp.item(),
+                    "flux": flux.item(),
+                    "bulk": bulk.item(),
+                    "loss": loss.item(),
+                }
+            )
             if step % 200 == 0:
                 print(
                     f"step={step} recon={logp.item():.6f} "
@@ -129,7 +140,11 @@ def train(
                 except Exception as e:
                     print(f"[viz] warning: visualization failed at step {step}: {e}")
             if step >= steps:
-                return final_metrics
+                return {
+                    "final": final_metrics,
+                    "history": history,
+                    "steps_per_epoch": max(len(dataloader), 1),
+                }
 
 
 # -----------------------------

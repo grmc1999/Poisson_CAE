@@ -454,6 +454,37 @@ reported in §5 of the paper.
 
 ## Phase 2 — Experiments on cluster (Sep 7–17)
 
+### Experiment table (79 jobs = 17 ladder + 62 ablation)
+
+Every run writes to `results/<exp>/<method-tag>_<timestamp>_<rand>/` containing
+`config.yml`, `metrics.json` (final metrics + method block), `loss_history.json`
+(per-step losses) and `losses_step.png` (4-panel loss curves, epoch overlay),
+plus `viz/` field plots when `viz_every > 0`. The method tag encodes
+scheme–kernel–(R|k)–t–λ–seed, e.g. `k-d-k32-t196-lam0.01-s0` (see
+`Utils/config.py:method_tag`).
+
+| Sweep | dataset | d | task | scheme | kernel | t | R / k | λ | steps | seeds | jobs | status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| mog_ladder | mog | 2 | recon | compact (L1) | diffusion | 0.5 | R=2.0 | 1e-2 | 5000 | 0,1 | 2 | s0✅ s1~ |
+| spirals_ladder | spirals | 2 | class | compact (L1) | diffusion | 0.5 | R=2.5 | 1e-2 | 5000 | 0,1 | 2 | s0✅ s1~ |
+| banana_ladder | banana | 2 | class | compact (L1) | diffusion | 0.25 | R=2.0 | 1e-2 | 5000 | 0,1 | 2 | s0✅ s1~ |
+| rings_ladder | rings | 2 | class | compact (L1) | diffusion | 0.25 | R=1.5 | 1e-2 | 5000 | 0,1 | 2 | todo |
+| breast_cancer_ladder | breast_cancer | 30 | class | knn (L2) | diffusion | 7.5 | k=32 | 1e-2 | 3000 | 0,1,2 | 3 | todo |
+| sinusoid_ladder | sinusoid_reg | 50 | reg (GRU) | knn (L2) | diffusion | 12.5 | k=32 | 1e-2 | 4000 | 0,1,2 | 3 | todo |
+| mnist_diffusion | mnist_flat | 784 | recon | knn (L2) | diffusion | 196 | k=64 | 1e-2 | 3000 | 0,1,2 | 3 | todo |
+| banana_lambda | banana | 2 | class | compact (L1) | diffusion | 0.25 | R=2.0 | {0,1e-3,3e-3,1e-2,3e-2,1e-1} | 5000 | 0,1 | 12 | todo |
+| banana_radius | banana | 2 | class | compact (L1) | diffusion | 0.25 | R∈{1,1.5,2,2.5,3} | 1e-2 | 5000 | 0,1 | 10 | todo |
+| banana_scheme_poisson | banana | 2 | class | {global,compact,knn} | poisson | 0.25 | – | 1e-2 | 5000 | 0,1 | 6 | todo |
+| banana_kernel | banana | 2 | class | compact (L1) | {poisson,diffusion} | 0.25 | R=2.0 | 1e-2 | 5000 | 0,1 | 4 | todo |
+| banana_variational | banana | 2 | class | {compact,variational} | diffusion | 0.25 | R=2.0 / i=5 | 1e-2 | 5000 | 0,1 | 4 | todo |
+| breast_cancer_k | breast_cancer | 30 | class | knn (L2) | diffusion | 7.5 | k∈{8,16,32,64} | 1e-2 | 3000 | 0,1 | 8 | todo |
+| mnist_k | mnist_flat | 784 | recon | knn (L2) | diffusion | 196 | k∈{16,32,64} | 1e-2 | 3000 | 0,1 | 6 | todo |
+| breast_cancer_corruption | breast_cancer | 30 | class | knn (L2) | diffusion | 7.5 | k=32 | 1e-2 | 3000 | 0,1 | 6 | todo |
+| banana_corruption | banana | 2 | class | compact (L1) | diffusion | 0.25 | R=2.0 | 1e-2 | 5000 | 0,1 | 6 | todo |
+
+Corruption-mode sweeps vary `train.corruption_mode ∈ {gaussian, ddpm, shift_scale}`; the
+other sweeps hold it at `gaussian`. `t = d/4` heuristic for tabular/images (MNIST: 196).
+
 - [x] SLURM job templates + sweep runner committed to repo; results synced back via git/tarball
 - [x] Experiment ladder (config-driven, `run.py` + `Utils/estimator_factory.py`):
   - Toys: mog / spirals / banana / rings (2D, compact-support + diffusion)

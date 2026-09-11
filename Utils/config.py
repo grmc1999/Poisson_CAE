@@ -264,10 +264,59 @@ def save_config(cfg: ExperimentConfig, path: str | os.PathLike) -> None:
         yaml.safe_dump(to_dict(cfg), fh, sort_keys=False)
 
 
+def _fmt_num(v: Any) -> str:
+    """Compact config-value formatting: 7.5 -> '7.5', 196.0 -> '196', 1e-05 -> '1e-05'."""
+    if not isinstance(v, (int, float)) or isinstance(v, bool):
+        return str(v)
+    if isinstance(v, int) or v.is_integer():
+        return str(int(v))
+    return format(v, "g")
+
+
+def method_tag(cfg: ExperimentConfig) -> str:
+    """Short human-readable tag identifying the estimator method for this run.
+
+    e.g.  ladder1-compact-diffusion-R2-t0.25           (banana ladder)
+          ladder1-knn-diffusion-k32-t196              (MNIST flat)
+          lambda1e-02-knn-diffusion-k32-t7.5          (breast cancer lambda sweep)
+    Scheme + kernel use short codes: global,g / compact,c / knn,k / variational,v
+    and poisson,p / diffusion,d.
+    """
+    scheme_code = {
+        "global": "g",
+        "compact": "c",
+        "knn": "k",
+        "variational": "v",
+    }.get(cfg.estimator.scheme, cfg.estimator.scheme)
+    kernel_code = {
+        "poisson": "p",
+        "diffusion": "d",
+    }.get(cfg.estimator.kernel_type, cfg.estimator.kernel_type)
+    parts = [scheme_code, kernel_code]
+    if cfg.estimator.scheme == "compact":
+        parts.append(f"R{_fmt_num(cfg.estimator.radius)}")
+    elif cfg.estimator.scheme == "knn":
+        parts.append(f"k{cfg.estimator.k}")
+    elif cfg.estimator.scheme == "variational":
+        parts.append(f"i{cfg.estimator.inner_steps}")
+    parts.append(f"t{_fmt_num(cfg.estimator.t)}")
+    parts.append(f"lam{_fmt_num(cfg.train.lam)}")
+    parts.append(f"s{cfg.data.seed}")
+    return "-".join(parts)
+
+
 def make_run_dir(cfg: ExperimentConfig, root: str = "results") -> Path:
-    """Create and return results/<experiment>/<timestamp>/ for this run."""
+    """Create and return results/<experiment>/<method>_<timestamp>/ for this run.
+
+    The method tag makes every result directory self-describing (scheme, kernel,
+    t, radius/k, λ, seed), so a run can be identified without opening config.yml.
+    A random suffix guards against same-second collisions in parallel sweeps.
+    """
+    from uuid import uuid4
+
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(root) / (cfg.name or cfg.data.experiment) / stamp
+    name = cfg.name or cfg.data.experiment
+    run_dir = Path(root) / name / f"{method_tag(cfg)}_{stamp}_{uuid4().hex[:4]}"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
