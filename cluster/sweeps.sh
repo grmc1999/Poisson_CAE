@@ -1,6 +1,6 @@
 #!/bin/bash
 # Generate every Phase 2 sweep. Run this ON THE CLUSTER LOGIN NODE after
-#   git pull && conda activate <env>
+#   git pull   (container ICA_v4.sif must be present at CONTAINER path)
 # because generated SLURM scripts bake in the repo path.
 #
 # Edit the three CLUSTER knobs below for your site, then:
@@ -19,13 +19,13 @@ cd "$REPO"
 # ---- EDIT THESE PER CLUSTER ----
 PARTITION="gpu"        # e.g. gpu on SDumont / ICA machine group
 ACCOUNT=""             # e.g. your allocation if required
-CONDA_ENV="torch"      # conda/py env with torch + deps
+CONTAINER="/share_zeta/Proxy-Sim/guillermo.carrillo/envs/ICA_v4.sif"
 # ---------------------------------
 
 run_sweep () {
   local name="$1"; shift
   python sweep.py --name "$name" \
-    --partition "$PARTITION" --account "$ACCOUNT" --conda-env "$CONDA_ENV" \
+    --partition "$PARTITION" --account "$ACCOUNT"     --container "$CONTAINER" \
     "$@"
 }
 

@@ -12,7 +12,5 @@
 #SBATCH --error=__LOGDIR__/%x.%A_%a.err
 
 source ~/.bashrc
-conda activate __CONDA_ENV__
 cd __REPO__
-
-python run.py __ARGS__
+singularity exec --nv __CONTAINER__ python3 run.py __ARGS__

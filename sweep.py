@@ -67,7 +67,7 @@ def render_job(name: str, args_str: str, opts) -> str:
         "MEM": opts.mem,
         "TIME": opts.time,
         "LOGDIR": str((repo_root / "cluster" / "logs" / name).resolve()),
-        "CONDA_ENV": opts.conda_env,
+        "CONTAINER": opts.container,
         "REPO": str(repo_root),
         "ARGS": args_str,
     }
@@ -96,7 +96,11 @@ def main(argv=None) -> None:
     ap.add_argument("--cpus", type=int, default=8)
     ap.add_argument("--mem", default="16G")
     ap.add_argument("--time", default="02:00:00")
-    ap.add_argument("--conda-env", default="torch")
+    ap.add_argument(
+        "--container",
+        default="/share_zeta/Proxy-Sim/guillermo.carrillo/envs/ICA_v4.sif",
+        help="Singularity container path (if set, jobs use singularity exec --nv)",
+    )
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
