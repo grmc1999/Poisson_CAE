@@ -91,6 +91,9 @@ def train(
             flux = PR.BC_loss(x, x_tilde, grad_v)
             bulk = PR.D_loss(x, y_true, y_pred, grad_v)
 
+            v_mag = v.detach().abs().mean().item()
+            gradv_mag = grad_v.detach().pow(2).sum(-1).sqrt().mean().item()
+
             loss = logp + lam * (flux - bulk)
 
             opt.zero_grad(set_to_none=True)
@@ -106,6 +109,8 @@ def train(
                     "flux": flux.item(),
                     "bulk": bulk.item(),
                     "loss": loss.item(),
+                    "v_mag": v_mag,
+                    "gradv_mag": gradv_mag,
                 }
             )
             if step % 200 == 0:
@@ -120,6 +125,8 @@ def train(
                         "final_flux": flux.item(),
                         "final_bulk": bulk.item(),
                         "final_loss": loss.item(),
+                        "final_v_mag": v_mag,
+                        "final_gradv_mag": gradv_mag,
                     }
                 )
 
