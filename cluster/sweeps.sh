@@ -19,12 +19,13 @@ cd "$REPO"
 # ---- EDIT THESE PER CLUSTER ----
 PARTITION="gpu"        # e.g. gpu on SDumont / ICA machine group
 ACCOUNT=""             # e.g. your allocation if required
+PYTHON="$(command -v python3 || command -v python)"
 CONTAINER="/share_zeta/Proxy-Sim/guillermo.carrillo/envs/ICA_v4.sif"
 # ---------------------------------
 
 run_sweep () {
   local name="$1"; shift
-  python sweep.py --name "$name" \
+  $PYTHON sweep.py --name "$name" \
     --partition "$PARTITION" --account "$ACCOUNT"     --container "$CONTAINER" \
     "$@"
 }
