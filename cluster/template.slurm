@@ -12,5 +12,9 @@
 #SBATCH --error=__LOGDIR__/%x.%A_%a.err
 
 source ~/.bashrc
-cd __REPO__
-singularity exec --nv __CONTAINER__ python3 run.py __ARGS__
+cd __REPO__ 2>/dev/null || true
+
+BINDS=""
+[ -d /share_zeta ] && BINDS="$BINDS -B /share_zeta:/share_zeta"
+
+singularity exec --nv $BINDS --pwd __REPO__ __CONTAINER__ python3 __REPO__/run.py __ARGS__
