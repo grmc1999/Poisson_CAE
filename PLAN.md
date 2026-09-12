@@ -488,7 +488,7 @@ scheme–kernel–(R|k)–t–λ–seed, e.g. `v-d-i5-t0.25-lam0.01-s0` (see
 | banana_variational | solver identity | scheme ∈ {compact, variational}, i=5 | 4 | ✅ done |
 | banana_var_screening | coercivity | mu ∈ {0, 0.01, 0.1, 1} (inert era) | 8 | ✅ done |
 | banana_var_inner | inner-GD convergence (BOP fidelity) | inner_steps ∈ {10, 50, 200}, lam=0.01 | 6 | generated (banana_var_inner_bl) |
-| banana_var_lambda | regularizer active? (bilevel) | lam ∈ {0, 1e-3, 1e-2, 1e-1}, K=100, lr=0.1 | 8 | generated (banana_var_lambda_bl) |
+| banana_var_lambda | regularizer active? (bilevel) | lam ∈ {0, 1e-3, 1e-2, 1e-1}, K=100, lr=0.1 | 8 | running (601640-601643, 601646-601649) |
 | banana_var_bc | Dirichlet strength | lam_d ∈ {0.1, 1, 10} | 6 | todo |
 | banana_kernel_tuned | kernel ablation | compact + diffusion, tuned {λ, R, t} | TBD | todo |
 

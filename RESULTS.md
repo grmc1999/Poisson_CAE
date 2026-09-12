@@ -146,8 +146,13 @@ was 0/blank at 92–94% white in dead runs).
 | 1 | banana_variational (scheme × seeds) | 601516–601519 | ✔ completed |
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
 | 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | generated, pending |
-| 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | generated, pending |
+| 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | **running** — 601640–601643 (λ=0,1e-3 × s0,1), 601646–601649 (λ=1e-2,1e-1 × s0,1; queued) |
 | 5 | banana_var_bc (lam_d × seeds) | pending | – |
+
+Sep 11 note: earlier submits 601596–601599 (1 h wall) and 601606–601609 were
+cancelled (stale divergence era). The re-submits above run the stability-fix code
+(40817c8); step-500 vizes verified healthy (white%≈50, std≈87 vs 92–94/0 for dead
+runs) on the first four jobs.
 
 Sweeps generated via `sweep.py`; submit 4 at a time with `sbatch run_XXXX.sh`
 from the sweep dir (regenerate the dirs *on the cluster* so `REPO` paths are
