@@ -31,6 +31,12 @@ class PotentialHead(nn.Module):
         net += [nn.Linear(h, 1)]
         self.net = nn.Sequential(*net)
 
+    def reset_parameters(self) -> None:
+        """Re-initialize like a freshly-constructed head (used after bailouts)."""
+        for layer in self.net:
+            if isinstance(layer, nn.Linear):
+                layer.reset_parameters()
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """(B, d) -> (B,) scalar potential."""
         return self.net(x).squeeze(-1)
@@ -87,13 +93,14 @@ def ritz_energy(
 # -----------------------------
 @dataclass
 class VariationalConfig:
-    mu: float = 0.0               # screening mass; 0 = pure Poisson
+    mu: float = 1e-2              # screening mass; stiffens the inner solve
     h: int = 128                  # hidden width
     layers: int = 3               # total layers (including input)
     inner_steps: int = 5          # K GD steps per outer step
     inner_lr: float = 1e-2        # learning rate for inner GD
     lam_d: float = 1.0            # Dirichlet soft-penalty weight
     boundary_as_ood: bool = True  # use x_tilde as Dirichlet anchors
+    inner_max_grad_norm: float = 0.5  # inner-step grad-norm clip (0 = off)
     bilevel: bool = True          # differentiate through the inner solve (BOP)
 
 
@@ -168,6 +175,11 @@ class BOPPoissonSolve(torch.autograd.Function):
         for _ in range(cfg.inner_steps):
             energy = ritz_energy(head, x_land.detach(), s, x_bd, mu=cfg.mu, lam_d=cfg.lam_d)
             grads = torch.autograd.grad(energy, theta, retain_graph=False)
+            if cfg.inner_max_grad_norm > 0 and len(grads) > 0:
+                gn = sum((gi * gi).sum() for gi in grads).sqrt()
+                scale = cfg.inner_max_grad_norm / (gn + 1e-8)
+                if float(scale.detach()) < 1.0:
+                    grads = [gi * scale for gi in grads]
             with torch.no_grad():
                 for p, g in zip(theta, grads):
                     p.sub_(cfg.inner_lr * g)
@@ -257,14 +269,20 @@ class BOPPoissonSolve(torch.autograd.Function):
             return torch.cat(out)
 
         u = cg_solve(hvp, b_flat)
+        if not torch.isfinite(u).all():
+            u = torch.zeros_like(u)
 
         # grad to s: dL/ds = -∇_s ⟨g, u⟩.
         u_blocks = _flat_blocks(u, shapes)
         gu = sum((gi * ui).sum() for gi, ui in zip(g, u_blocks))
         (gs,) = torch.autograd.grad(gu, s, retain_graph=False, allow_unused=True)
         gs = -gs if gs is not None else torch.zeros_like(s)
+        if not torch.isfinite(gs).all():
+            gs = torch.zeros_like(s)
 
         grad_x = gxq if torch.is_tensor(gxq) else torch.zeros_like(x_query)
+        if not torch.isfinite(grad_x).all():
+            grad_x = torch.zeros_like(x_query)
         return grad_x, None, gs, None, None
 
 
@@ -275,6 +293,7 @@ class VariationalEstimator(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.v = PotentialHead(d, cfg.h, cfg.layers)
+        self.n_bailouts = 0
 
     def forward(self, x_query: torch.Tensor, x_land: torch.Tensor, g_land: torch.Tensor
                 ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -287,8 +306,18 @@ class VariationalEstimator(nn.Module):
         BC has no model path — known inert, kept for comparison).
         """
         if not self.cfg.bilevel:
-            return self._forward_inert(x_query, x_land, g_land)
-        return BOPPoissonSolve.apply(x_query, x_land, g_land, self.v, self.cfg)
+            v, gradv = self._forward_inert(x_query, x_land, g_land)
+        else:
+            v, gradv = BOPPoissonSolve.apply(x_query, x_land, g_land, self.v, self.cfg)
+        # Bailout guard: a divergent inner solve must never poison the outer
+        # loss (0 * NaN = NaN kills even the lam=0 runs). On failure return a
+        # zero field (regularizer contributes 0 this step) and re-init the head
+        # so the warm-started inner solve starts fresh next step.
+        if not (torch.isfinite(v).all() and torch.isfinite(gradv).all()).item():
+            self.n_bailouts += 1
+            self.v.reset_parameters()
+            return (torch.zeros_like(v.detach()), torch.zeros_like(gradv.detach()))
+        return v, gradv
 
     def _forward_inert(self, x_query, x_land, g_land):
         """Original stop-gradient path (deprecated; kept for the ablation)."""

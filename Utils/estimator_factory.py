@@ -73,6 +73,7 @@ def build_estimator(cfg: EstimatorConfig, d: int) -> nn.Module:
                 inner_steps=cfg.inner_steps,
                 inner_lr=cfg.inner_lr,
                 lam_d=cfg.lam_d,
+                inner_max_grad_norm=cfg.inner_max_grad_norm,
                 bilevel=cfg.bilevel,
             ),
             d=d,

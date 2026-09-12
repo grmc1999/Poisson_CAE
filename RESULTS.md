@@ -124,6 +124,19 @@ flux-only case — silently zeroing `gs`. PyTorch 2.13 gotcha: custom
   the BOP-fidelity curve and sets the default K for every later solver run,
   including the Phase 2 datasets.
 
+**Sep 11 stability fix (before the re-sweep):** instrumented runs showed the inner
+Ritz solve itself diverging to NaN (v/∇v non-finite in the *forward* at ~step
+200–400, µ=0; µ=1e-2 alone insufficient), which then poisoned `loss = logp +
+lam*(flux-bulk)` even at λ=0 (0·NaN=NaN) → whole model went NaN and all viz
+panels were white. Fix land `EstimatorConfig.mu` default → 1e-2 (conditioning
+aid), added `inner_max_grad_norm` (default 0.5) per-step gradient clip on the
+inner GD, forward/backward finite-bailout guards (zero field + head reset,
+log `n_bailouts` in metrics), and recorded μ/clip in method block. Validation:
+50/50 tests pass; transition harness clean to 400 steps with **0 bailouts**
+(default config and clip-only); full `run.py` banana CPU run to step 600 (the
+old death window) finite loss, `bailouts: 0`, step-500 viz non-blank (std≈87,
+was 0/blank at 92–94% white in dead runs).
+
 ---
 
 ## Running log

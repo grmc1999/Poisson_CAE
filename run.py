@@ -124,6 +124,8 @@ def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
 
     metrics = {"task": task, "input_dim": input_dim}
     metrics.update(train_out.get("final") or {})
+    if isinstance(estimator, torch.nn.Module):
+        metrics["bailouts"] = int(getattr(estimator, "n_bailouts", 0))
     if run_dir is not None:
         history = train_out.get("history") or []
         steps_per_epoch = train_out.get("steps_per_epoch") or 1
@@ -301,6 +303,7 @@ def main(argv=None):
             "mu": cfg.estimator.mu,
             "inner_steps": cfg.estimator.inner_steps,
             "inner_lr": cfg.estimator.inner_lr,
+            "inner_max_grad_norm": cfg.estimator.inner_max_grad_norm,
             "lam_d": cfg.estimator.lam_d,
             "bilevel": cfg.estimator.bilevel,
         }

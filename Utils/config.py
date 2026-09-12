@@ -87,12 +87,13 @@ class EstimatorConfig:
     k: int = 32                    # L2 kNN neighbours per query
     normalize: bool = True         # normalize localized quadrature by cardinality/k
     # variational (Ritz) knobs
-    mu: float = 0.0                # screening mass
+    mu: float = 1e-2               # screening mass (stiffens the inner solve)
     v_hidden: int = 128            # PotentialHead width
     v_layers: int = 3              # PotentialHead depth
     inner_steps: int = 5           # K inner GD steps per outer step
     inner_lr: float = 1e-2        # inner GD learning rate
     lam_d: float = 1.0             # Dirichlet soft-penalty weight
+    inner_max_grad_norm: float = 0.5  # inner-step grad-norm clip (0 = off)
     bilevel: bool = True           # differentiate through the inner solve (BOP)
 
 
