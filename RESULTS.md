@@ -128,7 +128,7 @@ flux-only case — silently zeroing `gs`. PyTorch 2.13 gotcha: custom
 Ritz solve itself diverging to NaN (v/∇v non-finite in the *forward* at ~step
 200–400, µ=0; µ=1e-2 alone insufficient), which then poisoned `loss = logp +
 lam*(flux-bulk)` even at λ=0 (0·NaN=NaN) → whole model went NaN and all viz
-panels were white. Fix land `EstimatorConfig.mu` default → 1e-2 (conditioning
+panels were white. Fix: `EstimatorConfig.mu` default → 1e-2 (conditioning
 aid), added `inner_max_grad_norm` (default 0.5) per-step gradient clip on the
 inner GD, forward/backward finite-bailout guards (zero field + head reset,
 log `n_bailouts` in metrics), and recorded μ/clip in method block. Validation:
@@ -136,6 +136,33 @@ log `n_bailouts` in metrics), and recorded μ/clip in method block. Validation:
 (default config and clip-only); full `run.py` banana CPU run to step 600 (the
 old death window) finite loss, `bailouts: 0`, step-500 viz non-blank (std≈87,
 was 0/blank at 92–94% white in dead runs).
+
+**Lambda bilevel sweep — COMPLETE (all 8 runs, 5000 steps, 0 bailouts, plots
+healthy through step 5000).** Decisive test that the regularizer is now *active*:
+
+| λ | seed | loss | recon | flux | bulk | v_mag | gradv_mag |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | 0.0716 | 0.0716 | −0.115 | −3.0e−5 | 6.77 | 1.44 |
+| 0 | 1 | 0.1133 | 0.1133 | +0.010 | −3.1e−4 | 6.67 | 1.28 |
+| 1e−3 | 0 | 0.0716 | 0.0715 | +0.094 | −1.0e−5 | 6.59 | 1.74 |
+| 1e−3 | 1 | 0.1134 | 0.1134 | +0.028 | −1.8e−4 | 6.82 | 0.98 |
+| 1e−2 | 0 | 0.0727 | 0.0718 | +0.089 | −2.4e−4 | 9.37 | 1.55 |
+| 1e−2 | 1 | 0.1158 | 0.1158 | +9.0e−5 | −4.6e−4 | 8.12 | 1.66 |
+| 1e−1 | 0 | 0.0972 | 0.0708 | +0.263 | −6.9e−4 | 25.39 | 6.01 |
+| 1e−1 | 1 | 0.1457 | 0.1139 | +0.317 | −1.2e−3 | 31.35 | 5.97 |
+
+- All runs finite, `bailouts: 0`, final vizes non-blank (white ≈ 50–55%, std ≈ 84–87).
+- The Poisson term now **visibly changes the solution** as λ grows: `v_mag`
+  6.7→25–31, `gradv_mag` 1.3→6.0, `flux` → ~0.26–0.32 (vs the inert era where λ
+  had no training effect). The bilevel gradient is working.
+- **Reconstruction is preserved**: `recon` at λ=0.1 (0.071/0.114) is statistically
+  equal to λ=0 (0.072/0.113); the extra loss at λ=0.1 comes from the Poisson
+  term, not from degrading the score/potential fit. `bulk≈0` throughout.
+- No test split on banana (`accuracy` unavailable) — λ-effect read from the
+  loss/flux/recon breakdown above.
+
+Next: inner-GD (BOP-fidelity) sweep `banana_var_inner_bl` (K ∈ {10,50,200} × seeds,
+12 h wall, queued candidates), then `banana_var_bc`, then Phase 2 datasets.
 
 ---
 
@@ -146,7 +173,7 @@ was 0/blank at 92–94% white in dead runs).
 | 1 | banana_variational (scheme × seeds) | 601516–601519 | ✔ completed |
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
 | 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | generated, pending |
-| 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | **running** — 601640–601643 (λ=0,1e-3 × s0,1), 601646–601649 (λ=1e-2,1e-1 × s0,1; queued) |
+| 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | ✔ completed — 601640–601643, 601646–601649 (see table above) |
 | 5 | banana_var_bc (lam_d × seeds) | pending | – |
 
 Sep 11 note: earlier submits 601596–601599 (1 h wall) and 601606–601609 were
