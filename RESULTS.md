@@ -172,7 +172,7 @@ Next: inner-GD (BOP-fidelity) sweep `banana_var_inner_bl` (K ∈ {10,50,200} × 
 |---|---|---|---|
 | 1 | banana_variational (scheme × seeds) | 601516–601519 | ✔ completed |
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
-| 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | generated, pending |
+| 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | **running** — 601902–601905 (K=10,50 × s0,1), 601912–601913 (K=200 × s0,1; pending) |
 | 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | ✔ completed — 601640–601643, 601646–601649 (see table above) |
 | 5 | banana_var_bc (lam_d × seeds) | pending | – |
 
