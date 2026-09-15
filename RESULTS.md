@@ -198,9 +198,21 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
 | 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | ✔ completed — 601902–601905, 601912–601913 (see table above) |
 | 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | ✔ completed — 601640–601643, 601646–601649 (see table above) |
-| 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ 5/6 complete — 602139–602142, 602170 ✅; 602171 ~~CANCELLED~~ (lam_d=3 s1 to re-slot). See table below |
+| 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ 5/6 complete — 602139–602142, 602170 ✅; lam_d=3 s1 re-slot **running 602580**. See table below |
 | 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✖ cancelled by policy (602172–602175) — re-slot later |
-| 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | ▶ running — 602265, 602266; 602267 |
+| 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | rings ✔ (602265, 602266) — table below; breast s0 ✖ **FAILED in `evaluate`** (602267, device mismatch cuda/cpu at final eval; training was clean to step 3000) → fixed in `e92a03a`, rerun queued (batch D) |
+| 8 | bc reslot (lam_d=3 s1) + mog_var (Phase 2) | `banana_var_bc` run_0005, `mog_var` | ▶ running — 602580 (bc-s1), 602581–602582 (mog) |
+
+**rings_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
+
+| seed | loss | recon | flux | bulk | v_mag | gradv_mag | accuracy |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 0 | 0.0401 | 0.0373 | +0.283 | – | 9.69 | 1.51 | n/a (no test split) |
+| 1 | 0.0430 | 0.0431 | −0.003 | – | 3.33 | 0.24 | n/a (no test split) |
+
+- Smooth 5000-step run both seeds, 0 bailouts; recon 0.037–0.043 well below the
+  banana/variance floor — field is localizing cleanly on rings. Accuracy column
+  empty because toy datasets have no test split (same limitation as banana).
 
 **banana_var_bc — 5/6 runs (5000 steps, 0 bailouts, lam=0.01, K=100).**
 
