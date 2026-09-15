@@ -161,8 +161,9 @@ healthy through step 5000).** Decisive test that the regularizer is now *active*
 - No test split on banana (`accuracy` unavailable) — λ-effect read from the
   loss/flux/recon breakdown above.
 
-Next: inner-GD (BOP-fidelity) sweep `banana_var_inner_bl` (K ∈ {10,50,200} × seeds,
-12 h wall, queued candidates), then `banana_var_bc`, then Phase 2 datasets.
+Next: `banana_var_bc` (running), then Phase 2: rings_var / breast_cancer_var /
+sinusoid_reg_var / mnist_var (mnist_variational pending cost pilot at d=784), then
+kernel-tuned ablation arms, then AE/VAE baselines.
 
 **Inner-GD (K) sweep — COMPLETE (all 6 runs, 5000 steps, 0 bailouts, lam=0.01,
 inner_lr=0.1, mu=1e-2 + clip).**
@@ -197,7 +198,13 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
 | 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | ✔ completed — 601902–601905, 601912–601913 (see table above) |
 | 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | ✔ completed — 601640–601643, 601646–601649 (see table above) |
-| 5 | banana_var_bc (lam_d × seeds) | pending | – |
+| 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ▶ running — 602139–602142, 602170–602171 (5000 steps, 12 h wall) |
+| 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ▶ running — 602172–602175 |
+
+Sep 15 note: bc (5) + Phase-2 toys (6) submitted after the λ + K sweeps completed;
+step-1500 vizes verified structured (std≈88–90, non-degenerate) at ~50 min in.
+bc batch 1 = lam_d {0.3,1}, batch 2 = lam_d {3} (602170–602171). Phase 2 toys:
+mog (recon, B/M=256, 5000 st) and spirals (class, 5000 st).
 
 Sep 11 note: earlier submits 601596–601599 (1 h wall) and 601606–601609 were
 cancelled (stale divergence era). The re-submits above run the stability-fix code
@@ -205,5 +212,8 @@ cancelled (stale divergence era). The re-submits above run the stability-fix cod
 runs) on the first four jobs.
 
 Sweeps generated via `sweep.py`; submit 4 at a time with `sbatch run_XXXX.sh`
-from the sweep dir (regenerate the dirs *on the cluster* so `REPO` paths are
-correct). Locally: 50/50 tests pass.
+from the sweep dir. Regenerate dirs *on the cluster* so `REPO` paths are correct
+(login node lacks singularity and has a broken torch — from a local box, generate
+then `sed 's+/share_zeta/.../Poisson_CAE/cluster/logs/+/share_zeta/.../Poisson_CAE/cluster/logs/+'`
+style-fix via `fix_upload.py` before `sbatch`, or regenerate on-cluster). Locally:
+50/50 tests pass.

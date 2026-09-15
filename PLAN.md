@@ -488,8 +488,8 @@ scheme–kernel–(R|k)–t–λ–seed, e.g. `v-d-i5-t0.25-lam0.01-s0` (see
 | banana_variational | solver identity | scheme ∈ {compact, variational}, i=5 | 4 | ✅ done |
 | banana_var_screening | coercivity | mu ∈ {0, 0.01, 0.1, 1} (inert era) | 8 | ✅ done |
 | banana_var_inner | inner-GD convergence (BOP fidelity) | inner_steps ∈ {10, 50, 200}, lam=0.01 | 6 | ✅ done — default K=100 |
-| banana_var_lambda | regularizer active? (bilevel) | lam ∈ {0, 1e-3, 1e-2, 1e-1}, K=100, lr=0.1 | 8 | running (601640-601643, 601646-601649) |
-| banana_var_bc | Dirichlet strength | lam_d ∈ {0.1, 1, 10} | 6 | todo |
+| banana_var_lambda | regularizer active? (bilevel) | lam ∈ {0, 1e-3, 1e-2, 1e-1}, K=100, lr=0.1 | 8 | ✅ done — regularizer ACTIVE (v_mag 6.7→25-31 @λ=0.1), recon preserved; default K=100 |
+| banana_var_bc | Dirichlet strength | lam_d ∈ {0.3, 1, 3}, K=100, lam=0.01 | 6 | running (602139-602142, 602170-602171) |
 | banana_kernel_tuned | kernel ablation | compact + diffusion, tuned {λ, R, t} | TBD | todo |
 
 Discontinued (superseded by the finding): banana_lambda / banana_radius /
@@ -503,10 +503,10 @@ Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
 
 | Sweep | dataset | d | task | solver | steps | jobs | status |
 |---|---|---|---|---|---|---|---|
-| mog_var | mog | 2 | recon | variational | 5000 | 2 | todo |
-| spirals_var | spirals | 2 | class | variational | 5000 | 2 | todo |
+| mog_var | mog | 2 | recon | variational | 5000 | 2 | running (602172-602173) |
+| spirals_var | spirals | 2 | class | variational | 5000 | 2 | running (602174-602175) |
 | rings_var | rings | 2 | class | variational | 5000 | 2 | todo |
-| breast_cancer_var | breast_cancer | 30 | class | variational | 4000 | 2 | todo |
+| breast_cancer_var | breast_cancer | 30 | class | variational | 3000 | 2 | todo |
 | sinusoid_var | sinusoid_reg | 50 | reg (GRU) | variational | 4000 | 2 | todo |
 | mnist_var | mnist_flat | 784 | recon | variational | 3000 | 2 | todo |
 | mog/spirals/rings_kernel | toys | 2 | – | tuned kernel arm | 5000 | 2 each | todo |
@@ -521,7 +521,7 @@ Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
       **fix implemented**: bilevel/BOP through the inner solve (`bilevel` config,
       `BOPPoissonSolve` + CG, FD-verified; `test_variational_bilevel_gradient_reaches_source`)
 - [x] Phase 1 sweeps screening (mu) + lambda + inner generated as `banana_var_{screening,inner_bl,lambda_bl}`
-- [ ] Phase 1 sweeps (lambda_bl / inner_bl / bc / kernel_tuned) — submitted via `sweep.py`
+- [x] Phase 1 sweeps lambda_bl + inner_bl done (defaults: K=100, mu=1e-2, clip=0.5); bc submitted (602139-602142, 602170-602171); kernel_tuned todo
 - [ ] Phase 2 datasets (mog, spirals, rings, breast_cancer, sinusoid, MNIST) with winner solver
 - [ ] Baselines: AE (no corruption), CAE (lam>0), DAE (lam=0), VAE
       (DAE obtainable as a `train.lam=0` config; AE/VAE need model additions)
