@@ -164,6 +164,29 @@ healthy through step 5000).** Decisive test that the regularizer is now *active*
 Next: inner-GD (BOP-fidelity) sweep `banana_var_inner_bl` (K ∈ {10,50,200} × seeds,
 12 h wall, queued candidates), then `banana_var_bc`, then Phase 2 datasets.
 
+**Inner-GD (K) sweep — COMPLETE (all 6 runs, 5000 steps, 0 bailouts, lam=0.01,
+inner_lr=0.1, mu=1e-2 + clip).**
+
+| K | seed | loss | recon | flux | bulk | v_mag | gradv_mag |
+|---|---:|---:|---:|---:|---:|---:|
+| 10 | 0 | 0.0714 | 0.0715 | −0.017 | −1.0e−5 | 11.12 | 2.54 |
+| 10 | 1 | 0.1120 | 0.1119 | +0.011 | −1.1e−4 | 2.84 | 0.63 |
+| 50 | 0 | 0.0710 | 0.0711 | −0.014 | −3.6e−4 | 8.50 | 1.51 |
+| 50 | 1 | 0.1149 | 0.1148 | +0.019 | −2.9e−4 | 16.84 | 1.85 |
+| 200 | 0 | 0.0709 | 0.0706 | +0.025 | −1.5e−4 | 7.36 | 1.12 |
+| 200 | 1 | 0.1134 | 0.1130 | +0.041 | −3.5e−4 | 7.37 | 0.69 |
+
+- Stable at every K (0 bailouts) — the clip guard holds the inner solve over the
+  whole K range.
+- **Fidelity signature**: field geometry converges with K — the two seeds' `v_mag`
+  are scattered at K=10 (11.1 vs 2.8) and K=50 (8.5 vs 16.8) but collapse to
+  7.36/7.37 at K=200; `gradv_mag` likewise. More converged inner solve → more
+  consistent BOP gradients across seeds.
+- **Cost/benefit**: recon at K=200 (0.0706/0.1130) is marginally better than the
+  λ-sweep K=100 reference (0.0718/0.1158); K=10 is noisier. Decision: default
+  **K=100** for Phase 2 runs (balance of cost v. field consistency; K=200 is
+  ~2× cost for a small further gain), consistent with the λ sweep runs.
+
 ---
 
 ## Running log
@@ -172,7 +195,7 @@ Next: inner-GD (BOP-fidelity) sweep `banana_var_inner_bl` (K ∈ {10,50,200} × 
 |---|---|---|---|
 | 1 | banana_variational (scheme × seeds) | 601516–601519 | ✔ completed |
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
-| 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | **running** — 601902–601905 (K=10,50 × s0,1), 601912–601913 (K=200 × s0,1; pending) |
+| 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | ✔ completed — 601902–601905, 601912–601913 (see table above) |
 | 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | ✔ completed — 601640–601643, 601646–601649 (see table above) |
 | 5 | banana_var_bc (lam_d × seeds) | pending | – |
 
