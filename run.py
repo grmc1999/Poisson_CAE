@@ -159,7 +159,8 @@ def evaluate(model, test_loader, task, device):
     mse = 0.0
     with torch.no_grad():
         for batch in test_loader:
-            x, y = batch[0].to(device), (batch[1] if len(batch) > 1 else None)
+            x = batch[0].to(device)
+            y = batch[1].to(device) if len(batch) > 1 else None
             if task == "reconstruction":
                 # y is absent / irrelevant: compare reconstruction to clean input.
                 mse += ((model(x) - x) ** 2).mean().item()
