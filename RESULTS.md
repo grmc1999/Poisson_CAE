@@ -198,8 +198,24 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
 | 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | ✔ completed — 601902–601905, 601912–601913 (see table above) |
 | 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | ✔ completed — 601640–601643, 601646–601649 (see table above) |
-| 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ▶ running — 602139–602142, 602170–602171 (5000 steps, 12 h wall) |
-| 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ▶ running — 602172–602175 |
+| 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ 5/6 complete — 602139–602142, 602170 ✅; 602171 ~~CANCELLED~~ (lam_d=3 s1 to re-slot). See table below |
+| 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✖ cancelled by policy (602172–602175) — re-slot later |
+| 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | ▶ running — 602265, 602266; 602267 |
+
+**banana_var_bc — 5/6 runs (5000 steps, 0 bailouts, lam=0.01, K=100).**
+
+| lam_d | seed | loss | recon | flux | bulk | v_mag | gradv_mag |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 0.3 | 0 | 0.0704 | 0.0713 | −0.086 | −6.1e−4 | 32.40 | 3.60 |
+| 0.3 | 1 | 0.1141 | 0.1142 | −0.013 | −3.9e−4 | 25.49 | 1.77 |
+| 1.0 | 0 | 0.0708 | 0.0710 | −0.019 | −3.0e−5 | 4.53 | 1.16 |
+| 1.0 | 1 | 0.1131 | 0.1131 | +0.003 | +2.5e−4 | 12.72 | 1.11 |
+| 3.0 | 0 | 0.0718 | 0.0719 | −0.008 | +5.8e−5 | 2.04 | 0.71 |
+| 3.0 | 1 | — | — | — | — | — | — (cancelled; re-slot) |
+
+- Dirichlet strength pins the boundary: `v_mag` 32→2 and `gradv_mag` 3.6→0.7 as
+  lam_d goes 0.3→3.0; `recon` is flat (0.071/0.114 for seeds 0/1) and `bulk≈0`
+  across the whole grid — the pin changes field scale, not reconstruction.
 
 Sep 15 note: bc (5) + Phase-2 toys (6) submitted after the λ + K sweeps completed;
 step-1500 vizes verified structured (std≈88–90, non-degenerate) at ~50 min in.
