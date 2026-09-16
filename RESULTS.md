@@ -201,7 +201,7 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ **6/6 complete** — 602139–602142, 602170, 602580 (table below) |
 | 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✔ complete — policy-canceled first (602172–602175), re-slotted: mog 602581–602582, spirals 602605/602648 (tables below) |
 | 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | ✔ complete — rings 602265/602266; breast s0 602267 FAILED in `evaluate` (device mismatch, fixed `e92a03a`) → rerun 602608 + s1 602609 done, **acc 0.9649** (table below) |
-| 8 | sinusoid_reg_var + mnist pilot (Phase 2) | `sinusoid_reg_var`,`mnist_var_pilot` | sinusoid ✔ **done** (602723 s0, 602734 s1, table below); mnist 300-step cost pilot running **602826** (fix: recon loaders yield x only, `447130b`) |
+| 8 | sinusoid_reg_var + mnist_var (Phase 2) | `sinusoid_reg_var`,`mnist_var` | sinusoid ✔ **done** (602723 s0, 602734 s1, table below); mnist 300-step pilot ✔ (602826, recon 0.043 @200 steps, ~2 s/step) → **full mnist_var running 602835/602836** |
 
 **rings_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
 
@@ -280,10 +280,12 @@ fine. Fixed by disabling the CuDNN RNN path in `GRUEncoder.forward`
 (`torch.backends.cudnn.flags(enabled=False)`, commit `83ec241`), verified by a
 cluster diag (602683, exit 0) then resubmitted s0/s1 (602723/602734) → both
 completed (~10 h wall each; GRU solver is slow — ~9 s/step). MNIST 300-step cost
-pilot (602736 FAILED — recon loaders bound labels to `y_true` → (B,) vs (B,784)
-mismatch; fixed in `447130b`, x-only loaders) → resubmitted 602826. Decision on
-full 3000-step mnist_var after the pilot's per-step cost is measured. Obeying the
-max-3-at-a-time submission policy via a top-up monitor (CAP=3, never exceeds).
+pilot (602778 FAILED — recon loaders bound labels to `y_true` → (B,) vs (B,784)
+mismatch; fixed in `447130b`, x-only loaders) → resubmitted 602826 and it
+completed in **9:53** (`results/mnist_flat/`, loss/recon 0.043, `v_mag` 1.29,
+0 bailouts, mse 0.036 → ~2 s/step) → full **mnist_var s0/s1 (3000 steps)
+submitted 602835/602836**. Obeying the max-3-at-a-time submission policy via a
+top-up monitor (CAP=3, never exceeds).
 
 Sep 15 note: bc (5) + Phase-2 toys (6) submitted after the λ + K sweeps completed;
 step-1500 vizes verified structured (std≈88–90, non-degenerate) at ~50 min in.

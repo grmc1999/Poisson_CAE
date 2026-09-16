@@ -508,7 +508,7 @@ Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
 | rings_var | rings | 2 | class | variational | 5000 | 2 | ✅ done (602265–602266) |
 | breast_cancer_var | breast_cancer | 30 | class | variational | 3000 | 2 | ✅ done (602608, 602609) — acc 0.9649 both |
 | sinusoid_var | sinusoid_reg | 50 | reg (GRU) | variational | 4000 | 2 | ✅ done (602723, 602734) after CuDNN double-backward fix (83ec241) |
-| mnist_var | mnist_flat | 784 | recon | variational | 3000 | 2 | 300-step cost pilot **602826** running (after loader fix 447130b); approval before full 3000-step |
+| mnist_var | mnist_flat | 784 | recon | variational | 3000 | 2 | ▶ full running (602835, 602836); 300-step pilot ✔ (602826, recon 0.043 @200, ~2 s/step) |
 | mog/spirals/rings_kernel | toys | 2 | – | tuned kernel arm | 5000 | 2 each | todo |
 | breast_cancer/mnist_kernel | tabular/img | 30/784 | – | tuned kernel arm | 3000 | 2 each | todo |
 
