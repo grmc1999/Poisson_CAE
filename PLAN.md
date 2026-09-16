@@ -508,7 +508,7 @@ Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
 | rings_var | rings | 2 | class | variational | 5000 | 2 | ✅ done (602265–602266) |
 | breast_cancer_var | breast_cancer | 30 | class | variational | 3000 | 2 | ✅ done (602608, 602609) — acc 0.9649 both |
 | sinusoid_var | sinusoid_reg | 50 | reg (GRU) | variational | 4000 | 2 | ✅ done (602723, 602734) after CuDNN double-backward fix (83ec241) |
-| mnist_var | mnist_flat | 784 | recon | variational | 3000 | 2 | ▶ full running (602835, 602836); 300-step pilot ✔ (602826, recon 0.043 @200, ~2 s/step) |
+| mnist_var | mnist_flat | 784 | recon | variational | 3000 | 2 | ✅ done — 602835/602836 complete (loss/recon ≈ 0.014–0.017, test MSE ≈ 0.013–0.014, 0 bailouts); pilot ✔ (602826) |
 | mog/spirals/rings_kernel | toys | 2 | – | tuned kernel arm | 5000 | 2 each | ✖ dropped — kernel losses unbounded/not meaningful |
 | breast_cancer/mnist_kernel | tabular/img | 30/784 | – | tuned kernel arm | 3000 | 2 each | ✖ dropped — kernel losses unbounded/not meaningful |
 
@@ -522,7 +522,7 @@ Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
       `BOPPoissonSolve` + CG, FD-verified; `test_variational_bilevel_gradient_reaches_source`)
 - [x] Phase 1 sweeps screening (mu) + lambda + inner generated as `banana_var_{screening,inner_bl,lambda_bl}`
 - [x] Phase 1 sweeps lambda_bl + inner_bl done (defaults: K=100, mu=1e-2, clip=0.5); bc submitted (602139-602142, 602170-602171); kernel_tuned todo
-- [ ] Phase 2 datasets (mog, spirals, rings, breast_cancer, sinusoid, MNIST) with winner solver
+- [x] Phase 2 datasets (mog, spirals, rings, breast_cancer, sinusoid, MNIST) with winner solver
 - [ ] Baselines: AE (no corruption), CAE (lam>0), DAE (lam=0), VAE
       (DAE obtainable as a `train.lam=0` config; AE/VAE need model additions)
 - [ ] Ablations: λ, locality radius R, neighbors k, global-vs-localized estimator,

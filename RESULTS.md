@@ -201,7 +201,7 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ **6/6 complete** — 602139–602142, 602170, 602580 (table below) |
 | 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✔ complete — policy-canceled first (602172–602175), re-slotted: mog 602581–602582, spirals 602605/602648 (tables below) |
 | 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | ✔ complete — rings 602265/602266; breast s0 602267 FAILED in `evaluate` (device mismatch, fixed `e92a03a`) → rerun 602608 + s1 602609 done, **acc 0.9649** (table below) |
-| 8 | sinusoid_reg_var + mnist_var (Phase 2) | `sinusoid_reg_var`,`mnist_var` | sinusoid ✔ **done** (602723 s0, 602734 s1, table below); mnist 300-step pilot ✔ (602826, recon 0.043 @200 steps, ~2 s/step) → **full mnist_var running 602835/602836** |
+| 8 | sinusoid_reg_var + mnist_var (Phase 2) | `sinusoid_reg_var`,`mnist_var` | sinusoid ✔ **done** (602723 s0, 602734 s1, table below); mnist 300-step pilot ✔ (602826, recon 0.043 @200 steps, ~2 s/step) → full **mnist_var complete 602835/602836** (table below) |
 
 **rings_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
 
@@ -272,6 +272,19 @@ inner_lr=0.1, mu=1e-2 + clip).**
   gradient, much lower test MSE 0.056). Both 0 bailouts, 8 viz saves; flux stays
   small — the sinusoid boundary is smooth.
 
+**mnist_var — complete (3000 steps, 0 bailouts, lam=0.01, variational K=100, knn, d=784).**
+
+| seed | loss | recon | flux | v_mag | gradv_mag | mse (test) |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0.01557 | 0.01552 | +0.00473 | 5.93 | 0.275 | 0.0140 |
+| 1 | 0.01740 | 0.01741 | −0.00055 | 1.39 | 0.029 | 0.0132 |
+
+- Both seeds clean (0 bailouts, ~1h40m wall each, 2 s/step), test MSE
+  ≈ 0.013–0.014 — a strong pixel-level reconstruction floor; flux stays O(1e-3).
+  Some seed variation in the field (`v_mag` 5.9 vs 1.4) at equal recon quality.
+- These s0/s1 runs predate `model_last.pt` checkpointing, so reconstruction-sample
+  PNGs require fresh runs (checkpoint + `sample_recon.py` shipped in `8c124aa`).
+
 Sep 16 note: bc 6/6 + all Phase-2 toys (mog, rings, spirals, breast, sinusoid)
 complete. sinusoid s0/s1 initially FAILED on GPU (602659/602660, 13–18 s, empty
 logs) — root cause: `_cudnn_rnn_backward … double backwards not supported` in the
@@ -283,9 +296,18 @@ completed (~10 h wall each; GRU solver is slow — ~9 s/step). MNIST 300-step co
 pilot (602778 FAILED — recon loaders bound labels to `y_true` → (B,) vs (B,784)
 mismatch; fixed in `447130b`, x-only loaders) → resubmitted 602826 and it
 completed in **9:53** (`results/mnist_flat/`, loss/recon 0.043, `v_mag` 1.29,
-0 bailouts, mse 0.036 → ~2 s/step) → full **mnist_var s0/s1 (3000 steps)
-submitted 602835/602836**. Obeying the max-3-at-a-time submission policy via a
-top-up monitor (CAP=3, never exceeds).
+0 bailouts, mse 0.036 → ~2 s/step) → full **mnist_var s0/s1 (3000 steps) ran to
+completion (602835/602836, 1h40m each, 0 bailouts)**. Obeying the max-3-at-a-time
+submission policy via a top-up monitor (CAP=3, never exceeds).
+
+Sep 16 (late) — reconstruction samples + perturbation schemes (user request):
+new `mask` / `dropout` corruption modes (`corruption_mask_frac`,
+`corruption_drop_p`), `model_last.pt` checkpoints saved by `run.py`, shared
+`Utils/pipeline.build_components`, and `sample_recon.py` (per-mode clean |
+corrupted | reconstruction PNG grids + `sample_metrics.json`). All shipped in
+`8c124aa`, pulled to ICA; 56/56 tests pass. Existing completed runs have no
+checkpoints, so producing the sample gallery needs fresh (re)training runs
+(only ~1.7 h per MNIST seed, ~10-40 min per toy).
 
 Kernel-tuned ablation arm (banana_kernel_tuned, mog/spirals/rings/breast/mnist
 `*_kernel`): **dropped** — starting the banana kernel run confirmed the kernel
