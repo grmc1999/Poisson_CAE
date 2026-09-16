@@ -287,6 +287,12 @@ completed in **9:53** (`results/mnist_flat/`, loss/recon 0.043, `v_mag` 1.29,
 submitted 602835/602836**. Obeying the max-3-at-a-time submission policy via a
 top-up monitor (CAP=3, never exceeds).
 
+Kernel-tuned ablation arm (banana_kernel_tuned, mog/spirals/rings/breast/mnist
+`*_kernel`): **dropped** — starting the banana kernel run confirmed the kernel
+estimator's losses are unbounded/not meaningful (it is the inert-gradient method
+that motivated the variational/bilevel solver). Variational is the sole method of
+record; the kernel arm has no value to keep.
+
 Sep 15 note: bc (5) + Phase-2 toys (6) submitted after the λ + K sweeps completed;
 step-1500 vizes verified structured (std≈88–90, non-degenerate) at ~50 min in.
 bc batch 1 = lam_d {0.3,1}, batch 2 = lam_d {3} (602170–602171). Phase 2 toys:
