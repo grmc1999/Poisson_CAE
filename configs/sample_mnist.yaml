@@ -1,0 +1,44 @@
+# Variational (bilevel) MNIST flat reconstruction (d=784).
+# Saves model_last.pt for the reconstruction-sample / perturbation-scheme gallery.
+name: mnist_flat
+data:
+  experiment: mnist_flat
+  batch_size: 128
+  seed: 0
+  encoder_type: mlp
+
+model:
+  hidden: 512
+  z_dim: 64
+
+train:
+  lr: 2.0e-4
+  lam: 1.0e-2
+  landmarks: 128
+  steps: 3000
+  viz_every: 500
+  viz_dir: outputs
+  corruption_mode: gaussian
+  corruption_T: 200
+  corruption_beta_start: 1.0e-4
+  corruption_beta_end: 2.0e-2
+  corruption_sigma: 0.3
+  poisson_eps: 1.0e-2
+
+estimator:
+  scheme: variational
+  kernel_type: diffusion
+  t: 196.0
+  eps: 1.0e-2
+  radius: 1.0
+  max_neighbors: 64
+  k: 64
+  normalize: true
+  mu: 1.0e-2
+  v_hidden: 128
+  v_layers: 3
+  inner_steps: 100
+  inner_lr: 0.1
+  lam_d: 1.0
+  inner_max_grad_norm: 0.5
+  bilevel: true
