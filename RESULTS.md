@@ -198,10 +198,10 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 2 | banana_var_screening (µ sweep, complete) | 601532–601535, 601572–601575 | ✔ completed (inert era; geometry only) |
 | 3 | banana_var_inner (bilevel, K × seeds) | `banana_var_inner_bl` | ✔ completed — 601902–601905, 601912–601913 (see table above) |
 | 4 | banana_var_lambda (bilevel, λ × seeds) | `banana_var_lambda_bl` | ✔ completed — 601640–601643, 601646–601649 (see table above) |
-| 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ 5/6 complete — 602139–602142, 602170 ✅; lam_d=3 s1 re-slot **running 602580**. See table below |
-| 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✖ cancelled by policy (602172–602175) — re-slot later |
-| 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | rings ✔ (602265, 602266) — table below; breast s0 ✖ **FAILED in `evaluate`** (602267, device mismatch cuda/cpu at final eval; training was clean to step 3000) → fixed in `e92a03a`, rerun queued (batch D) |
-| 8 | bc reslot (lam_d=3 s1) + mog_var (Phase 2) | `banana_var_bc` run_0005, `mog_var` | ▶ running — 602580 (bc-s1), 602581–602582 (mog) |
+| 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ **6/6 complete** — 602139–602142, 602170, 602580 (table below) |
+| 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✔ complete — policy-canceled first (602172–602175), re-slotted: mog 602581–602582, spirals 602605/602648 (tables below) |
+| 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | ✔ complete — rings 602265/602266; breast s0 602267 FAILED in `evaluate` (device mismatch, fixed `e92a03a`) → rerun 602608 + s1 602609 done, **acc 0.9649** (table below) |
+| 8 | sinusoid_reg_var + mnist pilot (Phase 2) | `sinusoid_reg_var`,`mnist_var_pilot` | ▶ sinusoid s0/s1 running (602723/602734) after CuDNN-fix (see note); mnist 300-step cost pilot running 602778 |
 
 **rings_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
 
@@ -223,11 +223,53 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 1.0 | 0 | 0.0708 | 0.0710 | −0.019 | −3.0e−5 | 4.53 | 1.16 |
 | 1.0 | 1 | 0.1131 | 0.1131 | +0.003 | +2.5e−4 | 12.72 | 1.11 |
 | 3.0 | 0 | 0.0718 | 0.0719 | −0.008 | +5.8e−5 | 2.04 | 0.71 |
-| 3.0 | 1 | — | — | — | — | — | — (cancelled; re-slot) |
+| 3.0 | 1 | 0.11104 | 0.11084 | – | – | 1.307 | – |
 
 - Dirichlet strength pins the boundary: `v_mag` 32→2 and `gradv_mag` 3.6→0.7 as
   lam_d goes 0.3→3.0; `recon` is flat (0.071/0.114 for seeds 0/1) and `bulk≈0`
   across the whole grid — the pin changes field scale, not reconstruction.
+
+**mog_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
+
+| seed | loss | recon | flux | v_mag | gradv_mag | bailouts |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0.00627 | 0.00629 | – | – | – | 0 |
+| 1 | 0.00720 | 0.00722 | – | – | – | 0 |
+
+- Clean null-recon field (loss ≈ recon ≈ 0.006–0.007), as expected for a
+  constant-cost dataset; 0 bailouts both seeds.
+
+**spirals_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
+
+| seed | loss | recon | flux | v_mag | gradv_mag | bailouts |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0.5767 | 0.5762 | +0.053 | 1.47 | 0.66 | 0 |
+| 1 | 0.6052 | 0.6048 | +0.032 | 2.80 | 0.70 | 0 |
+
+- Overlapping-class toy: recon ≈ loss at 0.58–0.61 floor, positive flux (field
+  aligns with the spiral direction), `v_mag` 1.5–2.8, 0 bailouts.
+
+**breast_cancer_var — complete (3000 steps, 0 bailouts, lam=0.01, K=100, knn B=128).**
+
+| seed | loss | recon | flux | v_mag | gradv_mag | accuracy |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | −0.00187 | 0.00017 | – | – | – | **0.9649** |
+| 1 | −0.00112 | 0.00057 | – | – | – | **0.9649** |
+
+- Both seeds reach 96.5% test accuracy with 0 bailouts from the fixed eval
+  (`e92a03a`); loss≈0 with recon≈0 — trivial data move is sufficient for
+  classification, so no field ever needs to fire.
+
+Sep 16 note: bc 6/6 + all Phase-2 toys (mog, rings, spirals, breast) complete.
+sinusoid s0/s1 initially FAILED on GPU (602659/602660, 13–18 s, empty logs) —
+root cause: `_cudnn_rnn_backward … double backwards not supported` in the
+bilevel variational solver's second-order pass through the GRU encoder; CPU ran
+fine. Fixed by disabling the CuDNN RNN path in `GRUEncoder.forward`
+(`torch.backends.cudnn.flags(enabled=False)`, commit `83ec241`), verified by a
+cluster diag (602683, exit 0) then resubmitted s0/s1 (602723/602734, healthy at
+1.5 h). MNIST 300-step cost pilot (602778) running; decision on full mnist_var
+after it lands. Obeying the max-3-at-a-time submission policy via a top-up
+monitor (CAP=3, never exceeds).
 
 Sep 15 note: bc (5) + Phase-2 toys (6) submitted after the λ + K sweeps completed;
 step-1500 vizes verified structured (std≈88–90, non-degenerate) at ~50 min in.
@@ -239,9 +281,8 @@ cancelled (stale divergence era). The re-submits above run the stability-fix cod
 (40817c8); step-500 vizes verified healthy (white%≈50, std≈87 vs 92–94/0 for dead
 runs) on the first four jobs.
 
-Sweeps generated via `sweep.py`; submit 4 at a time with `sbatch run_XXXX.sh`
-from the sweep dir. Regenerate dirs *on the cluster* so `REPO` paths are correct
-(login node lacks singularity and has a broken torch — from a local box, generate
-then `sed 's+/share_zeta/.../Poisson_CAE/cluster/logs/+/share_zeta/.../Poisson_CAE/cluster/logs/+'`
-style-fix via `fix_upload.py` before `sbatch`, or regenerate on-cluster). Locally:
-50/50 tests pass.
+Sweeps generated via `sweep.py`; submit **max 3 at a time** with `sbatch
+run_XXXX.sh` (policy — top-up monitor caps at 3). Regenerate dirs *on the
+cluster* so `REPO` paths are correct (login node lacks singularity and has a
+broken torch — from a local box, generate then path-fix via `fix_upload.py`
+before `sbatch`, or regenerate on-cluster). Locally: 50/50 tests pass.
