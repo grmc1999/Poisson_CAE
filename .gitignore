@@ -9,3 +9,7 @@ outputs/
 data/
 cluster/jobs/
 cluster/logs/
+
+tmp_sin/
+err.txt
+
