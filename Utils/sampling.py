@@ -66,11 +66,14 @@ def save_reconstruction_grid(
     result: Dict[str, Any],
     input_dim: int,
     out_dir: Path,
+    mode: Optional[str] = None,
 ) -> None:
     """Save a recon_samples.png + sample_metrics.json to *out_dir*."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
+    title_suffix = f" — corruption: {mode}" if mode else ""
 
     out_dir.mkdir(parents=True, exist_ok=True)
     clean = result["clean"]
@@ -80,12 +83,13 @@ def save_reconstruction_grid(
 
     if input_dim == 784:
         fig, axes = plt.subplots(n, 3, figsize=(6, 2 * n))
+        fig.suptitle(f"corruption: {mode}" if mode else "reconstruction samples", y=1.0)
         for i in range(n):
             for j, img in enumerate([clean[i], corrupt[i], recon[i]]):
                 ax = axes[i][j]
                 ax.imshow(img.view(28, 28).cpu().numpy(), cmap="gray")
                 ax.axis("off")
-        fig.tight_layout()
+        fig.tight_layout(rect=[0, 0, 1, 0.96])
         fig.savefig(out_dir / "recon_samples.png", dpi=150)
         plt.close(fig)
     else:
@@ -107,7 +111,8 @@ def save_reconstruction_grid(
         ax.scatter(cr_np[:, 0], cr_np[:, 1], c="tab:blue", alpha=0.5, s=8, label="corrupt")
         ax.scatter(re_np[:, 0], re_np[:, 1], c="tab:green", alpha=0.5, s=8, label="recon")
         ax.legend()
-        ax.set_title("reconstruction (PCA-2D)" if input_dim > 2 else "reconstruction (2D)")
+        base_title = "reconstruction (PCA-2D)" if input_dim > 2 else "reconstruction (2D)"
+        ax.set_title(base_title + title_suffix)
         fig.tight_layout()
         fig.savefig(out_dir / "recon_samples.png", dpi=150)
         plt.close(fig)
@@ -161,7 +166,7 @@ def generate_samples(
             result = sample_batch(model, Pi, loader, device, n=n, seed=seed)
 
         mode_dir = run_dir / f"samples_{mode}"
-        save_reconstruction_grid(result, input_dim, mode_dir)
+        save_reconstruction_grid(result, input_dim, mode_dir, mode=mode)
         results[mode] = {"recon_mse": result["recon_mse"], "corrupt_mse": result["corrupt_mse"]}
 
     return results
