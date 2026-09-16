@@ -202,7 +202,11 @@ class GRUEncoder(nn.Module):
         # If flattened length differs, try to reshape safely.
         if x.size(1) != self.T:
             raise ValueError(f"Expected sequence length T={self.T}, got {x.size(1)}")
-        h, _ = self.gru(x)
+        # CuDNN RNN does not support double backward, which the bilevel
+        # variational solver needs (Hessian-vector products through the
+        # encoder). Force the native RNN implementation on CUDA.
+        with torch.backends.cudnn.flags(enabled=False):
+            h, _ = self.gru(x)
         last = h[:, -1, :]
         return self.proj(last)
 
