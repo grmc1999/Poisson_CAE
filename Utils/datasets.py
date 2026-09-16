@@ -201,14 +201,16 @@ def get_mnist_flat_loaders(
     train_ds = datasets.MNIST(root, train=True, download=True, transform=tfm)
     test_ds = datasets.MNIST(root, train=False, download=True, transform=tfm)
 
-    def _pack(ds) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = torch.stack([t[0] for t in ds]).view(len(ds), -1)  # (N, 784) in [0,1]
-        y = torch.tensor([t[1] for t in ds], dtype=torch.long)
-        return x, y
+    def _pack(ds) -> torch.Tensor:
+        return torch.stack([t[0] for t in ds]).view(len(ds), -1)  # (N, 784) in [0,1]
 
-    tr = _to_loader(*_pack(train_ds), cfg)
+    # Reconstruction task: labels are ignored (y_true = x), so the loaders must
+    # yield x only — otherwise `train` binds y_true to the label tensor and the
+    # recon loss gets a (B,) vs (B,784) shape mismatch.
+    tr = _to_loader(_pack(train_ds), None, cfg)
     te = _to_loader(
-        *_pack(test_ds),
+        _pack(test_ds),
+        None,
         LoaderCfg(batch_size=cfg.batch_size, shuffle=False, drop_last=False,
                   num_workers=cfg.num_workers),
     )
