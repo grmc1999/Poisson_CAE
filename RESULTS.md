@@ -201,7 +201,7 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 5 | banana_var_bc (lam_d ∈ {0.3,1,3} × seeds, K=100) | `banana_var_bc` | ✔ **6/6 complete** — 602139–602142, 602170, 602580 (table below) |
 | 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✔ complete — policy-canceled first (602172–602175), re-slotted: mog 602581–602582, spirals 602605/602648 (tables below) |
 | 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | ✔ complete — rings 602265/602266; breast s0 602267 FAILED in `evaluate` (device mismatch, fixed `e92a03a`) → rerun 602608 + s1 602609 done, **acc 0.9649** (table below) |
-| 8 | sinusoid_reg_var + mnist pilot (Phase 2) | `sinusoid_reg_var`,`mnist_var_pilot` | ▶ sinusoid s0/s1 running (602723/602734) after CuDNN-fix (see note); mnist 300-step cost pilot running 602778 |
+| 8 | sinusoid_reg_var + mnist pilot (Phase 2) | `sinusoid_reg_var`,`mnist_var_pilot` | sinusoid ✔ **done** (602723 s0, 602734 s1, table below); mnist 300-step cost pilot running **602826** (fix: recon loaders yield x only, `447130b`) |
 
 **rings_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
 
@@ -214,7 +214,7 @@ inner_lr=0.1, mu=1e-2 + clip).**
   banana/variance floor — field is localizing cleanly on rings. Accuracy column
   empty because toy datasets have no test split (same limitation as banana).
 
-**banana_var_bc — 5/6 runs (5000 steps, 0 bailouts, lam=0.01, K=100).**
+**banana_var_bc — 6/6 runs (5000 steps, 0 bailouts, lam=0.01, K=100).**
 
 | lam_d | seed | loss | recon | flux | bulk | v_mag | gradv_mag |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -260,16 +260,30 @@ inner_lr=0.1, mu=1e-2 + clip).**
   (`e92a03a`); loss≈0 with recon≈0 — trivial data move is sufficient for
   classification, so no field ever needs to fire.
 
-Sep 16 note: bc 6/6 + all Phase-2 toys (mog, rings, spirals, breast) complete.
-sinusoid s0/s1 initially FAILED on GPU (602659/602660, 13–18 s, empty logs) —
-root cause: `_cudnn_rnn_backward … double backwards not supported` in the
+**sinusoid_reg_var — complete (4000 steps, 0 bailouts, lam=0.01, variational K=100, GRU d=50).**
+
+| seed | loss | recon | flux | v_mag | gradv_mag | mse (test) |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 1.11907 | 1.11910 | −0.00275 | 0.924 | 0.096 | 1.076 |
+| 1 | 0.03266 | 0.03264 | +0.00244 | 0.621 | 0.398 | 0.056 |
+
+- High seed variance: seed 0 is stuck in a near-constant field regime (recon ≈
+  1.12, weak `v_mag`/`gradv`), seed 1 captures the sinusoid (recon 0.033, stronger
+  gradient, much lower test MSE 0.056). Both 0 bailouts, 8 viz saves; flux stays
+  small — the sinusoid boundary is smooth.
+
+Sep 16 note: bc 6/6 + all Phase-2 toys (mog, rings, spirals, breast, sinusoid)
+complete. sinusoid s0/s1 initially FAILED on GPU (602659/602660, 13–18 s, empty
+logs) — root cause: `_cudnn_rnn_backward … double backwards not supported` in the
 bilevel variational solver's second-order pass through the GRU encoder; CPU ran
 fine. Fixed by disabling the CuDNN RNN path in `GRUEncoder.forward`
 (`torch.backends.cudnn.flags(enabled=False)`, commit `83ec241`), verified by a
-cluster diag (602683, exit 0) then resubmitted s0/s1 (602723/602734, healthy at
-1.5 h). MNIST 300-step cost pilot (602778) running; decision on full mnist_var
-after it lands. Obeying the max-3-at-a-time submission policy via a top-up
-monitor (CAP=3, never exceeds).
+cluster diag (602683, exit 0) then resubmitted s0/s1 (602723/602734) → both
+completed (~10 h wall each; GRU solver is slow — ~9 s/step). MNIST 300-step cost
+pilot (602736 FAILED — recon loaders bound labels to `y_true` → (B,) vs (B,784)
+mismatch; fixed in `447130b`, x-only loaders) → resubmitted 602826. Decision on
+full 3000-step mnist_var after the pilot's per-step cost is measured. Obeying the
+max-3-at-a-time submission policy via a top-up monitor (CAP=3, never exceeds).
 
 Sep 15 note: bc (5) + Phase-2 toys (6) submitted after the λ + K sweeps completed;
 step-1500 vizes verified structured (std≈88–90, non-degenerate) at ~50 min in.
