@@ -20,7 +20,7 @@ def make_ddpm_coeffs(betas: torch.Tensor) -> Dict[str, torch.Tensor]:
 
 @dataclass
 class CorruptionConfig:
-    mode: str = "ddpm"          # "ddpm", "gaussian", "shift_scale", "mixture"
+    mode: str = "ddpm"          # "ddpm", "gaussian", "shift_scale", "mixture", "mask", "dropout"
     T: int = 200
     beta_start: float = 1e-4
     beta_end: float = 2e-2
@@ -30,6 +30,8 @@ class CorruptionConfig:
     p_ddpm: float = 0.5
     p_gaussian: float = 0.3
     p_shift_scale: float = 0.2
+    mask_frac: float = 0.3       # fraction of dims zeroed (mask mode)
+    drop_p: float = 0.2          # probability of dropping a dim (dropout mode)
 
 class CorruptionOperator(nn.Module):
     def __init__(self, cfg: CorruptionConfig):
@@ -64,6 +66,17 @@ class CorruptionOperator(nn.Module):
         shift = self.cfg.shift_std * torch.randn_like(x)
         return scale * x + shift
 
+    def mask_corrupt(self, x: torch.Tensor) -> torch.Tensor:
+        B, D = x.shape
+        frac = self.cfg.mask_frac
+        mask = (torch.rand(B, D, device=x.device) > frac).float()
+        return x * mask
+
+    def dropout_corrupt(self, x: torch.Tensor) -> torch.Tensor:
+        keep = 1.0 - self.cfg.drop_p
+        mask = (torch.rand_like(x) < keep).float()
+        return x * mask
+
     def forward(self, x: torch.Tensor, t: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         mode = self.cfg.mode
         if mode == "ddpm":
@@ -73,6 +86,10 @@ class CorruptionOperator(nn.Module):
             return self.gaussian_corrupt(x), None
         if mode == "shift_scale":
             return self.shift_scale_corrupt(x), None
+        if mode == "mask":
+            return self.mask_corrupt(x), None
+        if mode == "dropout":
+            return self.dropout_corrupt(x), None
         if mode == "mixture":
             B = x.size(0)
             device = x.device

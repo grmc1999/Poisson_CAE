@@ -1,0 +1,39 @@
+name: sinusoid_reg
+data:
+  experiment: sinusoid_reg
+  batch_size: 256
+  seed: 0
+  encoder_type: gru
+model:
+  hidden: 64
+  z_dim: 32
+train:
+  lr: 0.001
+  lam: 0.01
+  landmarks: 256
+  steps: 201
+  viz_every: 0
+  viz_dir: outputs
+  corruption_mode: gaussian
+  corruption_T: 200
+  corruption_beta_start: 0.0001
+  corruption_beta_end: 0.02
+  corruption_sigma: 0.05
+  poisson_eps: 0.01
+estimator:
+  scheme: knn
+  kernel_type: diffusion
+  t: 12.5
+  eps: 0.01
+  radius: 1.0
+  max_neighbors: 64
+  k: 32
+  normalize: true
+  mu: 0.01
+  v_hidden: 128
+  v_layers: 3
+  inner_steps: 5
+  inner_lr: 0.01
+  lam_d: 1.0
+  inner_max_grad_norm: 0.5
+  bilevel: true

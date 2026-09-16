@@ -23,19 +23,9 @@ from Utils.config import (
     metrics_to_json,
     make_run_dir,
     save_config,
+    to_dict,
 )
-from Utils.datasets import LoaderCfg, get_experiment_loaders
-from Utils.estimator_factory import build_estimator
-from Utils.projectors import CorruptionConfig, CorruptionOperator
-
-from models import (
-    AE_model,
-    Classifier_model,
-    Encoder,
-    Decoder,
-    GRUEncoder,
-    Regressor_model,
-)
+from Utils.pipeline import build_components
 
 
 def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
@@ -43,66 +33,7 @@ def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
 
     Returns a metrics dict (task, input_dim, optional test accuracy/MSE).
     """
-    torch.manual_seed(cfg.data.seed)
-
-    # Data loaders
-    if cfg.data.experiment == "mog":
-        N = 5000
-        centers = torch.tensor(
-            [[-1.0, 0.0], [1.0, 0.0], [0.0, 1.25]], dtype=torch.float32
-        )
-        comp = torch.randint(0, centers.size(0), (N,))
-        x = centers[comp] + 0.15 * torch.randn(N, 2)
-        from torch.utils.data import DataLoader, TensorDataset
-
-        loader = DataLoader(
-            TensorDataset(x), batch_size=cfg.data.batch_size, shuffle=True, drop_last=True
-        )
-        test_loader = None
-        input_dim = 2
-        task = "reconstruction"
-    else:
-        loader, test_loader, input_dim, task = get_experiment_loaders(
-            cfg.data.experiment,
-            LoaderCfg(
-                batch_size=cfg.data.batch_size, shuffle=True, drop_last=True, num_workers=0
-            ),
-            seed=cfg.data.seed,
-        )
-
-    # Model selection by task (mirrors main.py)
-    if task == "reconstruction":
-        model = AE_model(
-            Encoder(d=input_dim, h=cfg.model.hidden, z=cfg.model.z_dim),
-            Decoder(z=cfg.model.z_dim, h=cfg.model.hidden, d=input_dim),
-        )
-    elif task == "classification":
-        # all classification tasks here are binary (2 classes)
-        model = Classifier_model(
-            Encoder(d=input_dim, h=cfg.model.hidden, z=cfg.model.z_dim), n_classes=2
-        )
-    elif task == "regression":
-        if cfg.data.encoder_type == "gru":
-            enc = GRUEncoder(T=input_dim, din=1, hidden=cfg.model.hidden, z_dim=cfg.model.z_dim)
-        else:
-            enc = Encoder(d=input_dim, h=cfg.model.hidden, z=cfg.model.z_dim)
-        model = Regressor_model(enc, out_dim=3)
-    else:
-        raise ValueError(f"Unknown task: {task}")
-
-    # Corruption operator Pi
-    Pi = CorruptionOperator(
-        CorruptionConfig(
-            mode=cfg.train.corruption_mode,
-            T=cfg.train.corruption_T,
-            beta_start=cfg.train.corruption_beta_start,
-            beta_end=cfg.train.corruption_beta_end,
-            sigma=cfg.train.corruption_sigma,
-        )
-    )
-
-    # Potential estimator (scheme / kernel_type / t from cfg.estimator)
-    estimator = build_estimator(cfg.estimator, d=input_dim)
+    model, Pi, estimator, loader, test_loader, input_dim, task = build_components(cfg, device)
 
     # Reuse main.py's training loop
     from main import train
@@ -121,6 +52,16 @@ def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
         viz_every=cfg.train.viz_every,
         viz_dir=viz_dir,
     ) or {}
+
+    # Save trained checkpoint (for downstream sampling / analysis)
+    if run_dir is not None:
+        ckpt = {
+            "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
+            "cfg": to_dict(cfg),
+            "task": task,
+            "input_dim": input_dim,
+        }
+        torch.save(ckpt, run_dir / "model_last.pt")
 
     metrics = {"task": task, "input_dim": input_dim}
     metrics.update(train_out.get("final") or {})

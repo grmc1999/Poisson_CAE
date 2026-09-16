@@ -59,11 +59,13 @@ class TrainConfig:
     steps: int = 5000
     viz_every: int = 500
     viz_dir: str = "outputs"
-    corruption_mode: str = "gaussian"   # gaussian | ddpm | shift_scale | mixture
+    corruption_mode: str = "gaussian"   # gaussian | ddpm | shift_scale | mixture | mask | dropout
     corruption_T: int = 200
     corruption_beta_start: float = 1e-4
     corruption_beta_end: float = 2e-2
     corruption_sigma: float = 0.1
+    corruption_mask_frac: float = 0.3   # fraction of dims zeroed out (mask mode)
+    corruption_drop_p: float = 0.2      # Bernoulli keep-prob (dropout mode, 0=full keep)
     poisson_eps: float = 1e-2
 
 
