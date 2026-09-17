@@ -49,6 +49,8 @@ class VizConfig:
     dpi: int = 160
     # PCA
     pca_max_points: int = 4096  # subsample for faster PCA/plotting
+    # context
+    corruption_mode: Optional[str] = None  # perturbation label in suptitle
 
 
 # -----------------------------
@@ -190,7 +192,10 @@ def visualize_fields_2d(
         ax.set_xlabel("x1")
         ax.set_ylabel("x2")
 
-    fig.suptitle(f"Poisson-CAE fields @ step {step}", y=1.02)
+    suptitle = f"Poisson-CAE fields @ step {step}"
+    if cfg.corruption_mode:
+        suptitle += f" — corruption: {cfg.corruption_mode}"
+    fig.suptitle(suptitle, y=1.02)
     fig.tight_layout()
 
     out_path = os.path.join(out_dir, f"fields_step_{step:06d}.png")
@@ -319,7 +324,10 @@ def visualize_fields_nd(
     ax.set_xlabel("PC1")
     ax.set_ylabel("PC2")
 
-    fig.suptitle(f"Poisson-CAE diagnostics (d={x_batch.shape[1]}) @ step {step}", y=1.02)
+    suptitle = f"Poisson-CAE diagnostics (d={x_batch.shape[1]}) @ step {step}"
+    if cfg.corruption_mode:
+        suptitle += f" — corruption: {cfg.corruption_mode}"
+    fig.suptitle(suptitle, y=1.02)
     fig.tight_layout()
 
     out_path = os.path.join(out_dir, f"fields_step_{step:06d}.png")

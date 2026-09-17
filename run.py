@@ -51,6 +51,7 @@ def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
         steps=cfg.train.steps,
         viz_every=cfg.train.viz_every,
         viz_dir=viz_dir,
+        corruption_mode=cfg.train.corruption_mode,
     ) or {}
 
     # Save trained checkpoint (for downstream sampling / analysis)
@@ -79,7 +80,12 @@ def build_pipeline(cfg: ExperimentConfig, device: str, run_dir=None):
                 json.dump(history, fh, indent=2)
             metrics["history_points"] = len(history)
             try:
-                _plot_loss_history(history, steps_per_epoch, str(run_dir / "losses_step.png"))
+                _plot_loss_history(
+                    history,
+                    steps_per_epoch,
+                    str(run_dir / "losses_step.png"),
+                    mode=cfg.train.corruption_mode,
+                )
                 metrics["loss_plot"] = "losses_step.png"
             except Exception as e:  # plotting must never kill a completed run
                 print(f"[plot] warning: loss plot failed: {e}")
@@ -126,7 +132,12 @@ def evaluate(model, test_loader, task, device):
     return metrics
 
 
-def _plot_loss_history(history: list[dict], steps_per_epoch: int, out_png: str) -> None:
+def _plot_loss_history(
+    history: list[dict],
+    steps_per_epoch: int,
+    out_png: str,
+    mode: str | None = None,
+) -> None:
     """Render per-step loss curves with epoch boundaries overlaid.
 
     4 stacked panels (recon / flux / bulk / total loss) share the training-step
@@ -180,7 +191,10 @@ def _plot_loss_history(history: list[dict], steps_per_epoch: int, out_png: str) 
     ax_top.set_xticks([e * steps_per_epoch for e in top_epochs])
     ax_top.set_xticklabels([str(e) for e in top_epochs])
 
-    fig.suptitle("training loss per step", fontsize=12)
+    title = "training loss per step"
+    if mode:
+        title += f" — corruption: {mode}"
+    fig.suptitle(title, fontsize=12)
     fig.tight_layout(rect=(0, 0, 1, 0.985))
     fig.savefig(out_png, dpi=150)
     plt.close(fig)

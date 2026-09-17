@@ -59,6 +59,7 @@ def train(
     steps: int = 5000,
     viz_every: int = 500,
     viz_dir: str = "outputs",
+    corruption_mode: str | None = None,
 ):
     model.to(device).train()
     Pi.to(device).eval()
@@ -142,7 +143,8 @@ def train(
                         out_dir=viz_dir,
                         step=step,
                         device=device,
-                        cfg=VizConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160),
+                        cfg=VizConfig(grid_n=160, padding=0.75, landmarks=landmarks, dpi=160,
+                                      corruption_mode=corruption_mode),
                     )
                 except Exception as e:
                     print(f"[viz] warning: visualization failed at step {step}: {e}")

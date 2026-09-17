@@ -56,3 +56,15 @@ def test_sampling_default_mode():
         results = generate_samples(run_dir, device="cpu", n=4)
         assert "gaussian" in results
         assert (run_dir / "samples_gaussian" / "recon_samples.png").exists()
+
+
+def test_sampling_out_tag():
+    with tempfile.TemporaryDirectory() as td:
+        run_dir = _make_dummy_run(Path(td))
+        results = generate_samples(run_dir, device="cpu", n=4, seed=0, out_tag="s0")
+        assert (run_dir / "samples_gaussian_s0" / "recon_samples.png").exists()
+        assert (run_dir / "samples_gaussian_s0" / "sample_metrics.json").exists()
+        # a second draw (different seed) writes to its own directory
+        generate_samples(run_dir, device="cpu", n=4, seed=1, out_tag="s1")
+        assert (run_dir / "samples_gaussian_s1" / "recon_samples.png").exists()
+        assert not (run_dir / "samples_gaussian" / "recon_samples.png").exists()

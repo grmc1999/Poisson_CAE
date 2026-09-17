@@ -33,6 +33,8 @@ def main(argv: list[str] | None = None) -> None:
                     help="torch device to run the model on (default cpu)")
     ap.add_argument("--seed", type=int, default=42,
                     help="RNG seed for selecting the sample batch (default 42)")
+    ap.add_argument("--tag", type=str, default=None,
+                    help="Output subdir tag -> samples_<mode>_<tag> (for multiple draws)")
     args = ap.parse_args(argv)
 
     modes = [m.strip() for m in args.modes.split(",")] if args.modes else None
@@ -42,6 +44,7 @@ def main(argv: list[str] | None = None) -> None:
         device=args.device,
         n=args.n,
         seed=args.seed,
+        out_tag=args.tag,
     )
     print(json.dumps(results, indent=2))
     return

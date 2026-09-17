@@ -131,10 +131,13 @@ def generate_samples(
     device: str = "cpu",
     n: int = 8,
     seed: int = 42,
+    out_tag: Optional[str] = None,
 ) -> Dict[str, Any]:
     """End-to-end: load model, sample under each corruption mode, save grids.
 
-    Returns dict mapping mode_name -> {recon_mse, corrupt_mse}.
+    Returns dict mapping mode_name -> {recon_mse, corrupt_mse}. Output goes to
+    ``samples_<mode>`` (or ``samples_<mode>_<out_tag>`` when *out_tag* is set,
+    so multiple draws/seeds can coexist).
     """
     cfg = load_run_config(run_dir)
     base_corruption_mode = cfg.train.corruption_mode
@@ -165,7 +168,8 @@ def generate_samples(
         else:
             result = sample_batch(model, Pi, loader, device, n=n, seed=seed)
 
-        mode_dir = run_dir / f"samples_{mode}"
+        suffix = f"_{out_tag}" if out_tag else ""
+        mode_dir = run_dir / f"samples_{mode}{suffix}"
         save_reconstruction_grid(result, input_dim, mode_dir, mode=mode)
         results[mode] = {"recon_mse": result["recon_mse"], "corrupt_mse": result["corrupt_mse"]}
 
