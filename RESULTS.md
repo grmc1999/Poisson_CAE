@@ -202,6 +202,7 @@ inner_lr=0.1, mu=1e-2 + clip).**
 | 6 | mog_var / spirals_var (Phase 2, variational) | `mog_var`,`spirals_var` | ✔ complete — policy-canceled first (602172–602175), re-slotted: mog 602581–602582, spirals 602605/602648 (tables below) |
 | 7 | rings_var + breast_cancer_var (Phase 2, variational) | `rings_var`,`breast_cancer_var` | ✔ complete — rings 602265/602266; breast s0 602267 FAILED in `evaluate` (device mismatch, fixed `e92a03a`) → rerun 602608 + s1 602609 done, **acc 0.9649** (table below) |
 | 8 | sinusoid_reg_var + mnist_var (Phase 2) | `sinusoid_reg_var`,`mnist_var` | sinusoid ✔ **done** (602723 s0, 602734 s1, table below); mnist 300-step pilot ✔ (602826, recon 0.043 @200 steps, ~2 s/step) → full **mnist_var complete 602835/602836** (table below) |
+| 9 | rotation/zoom modes (Part A) + classification perturbation ablation (Part B) | `sample_ablation_mnist`, `class_ablation_{banana,rings,spirals,breast_cancer}` | 🔄 queued/running — see Sep 17 note below |
 
 **rings_var — complete (5000 steps, 0 bailouts, lam=0.01, variational K=100).**
 
@@ -330,3 +331,36 @@ run_XXXX.sh` (policy — top-up monitor caps at 3). Regenerate dirs *on the
 cluster* so `REPO` paths are correct (login node lacks singularity and has a
 broken torch — from a local box, generate then path-fix via `fix_upload.py`
 before `sbatch`, or regenerate on-cluster). Locally: 50/50 tests pass.
+
+Sep 17 — corruption extension + classification perturbation ablation (`2782e67`, `a46f372`):
+- **Part A — rotation/zoom modes.** `CorruptionOperator` gains `rotation`
+  (per-sample angle, `corruption_rotation_max_deg=30`) and `zoom`
+  (per-sample scale, `corruption_zoom_std=0.15`). For `mnist_flat`
+  (`image_side=28`) they use an affine resample of the 28×28 layout; for 2D point
+  data rotation acts on the first two coords. `generate_all_samples.py` defaults
+  stay at the 5 original modes; the MNIST cluster job passes the 7-mode list.
+- **Part B — classification perturbation benchmark.** New `configs/class_*.yaml`
+  (banana/rings/spirals/breast_cancer; variational bilevel, Phase-2 hparams) and
+  `eval_perturbation.py` (loads `model_last.pt` + config, evaluates clean test
+  accuracy and accuracy under the run's training corruption → `perturbation_eval.json`).
+  `method_tag` now appends the corruption mode so run dirs are self-describing.
+  banana/rings/spirals/breast_cancer got held-out test draws (distinct seed) —
+  the earlier `rings_var`/toys had no test split, so accuracy was unavailable.
+- **Bug: `grid_sampler_2d_backward` not implemented** (jobs 604824/604825 FAILED,
+  23–38 s). The bilevel variational estimator needs **second-order** grads, which
+  `F.grid_sample` lacks; detaching the corruption would break
+  `Classifier_model.score_value` (needs ∂logp/∂x_clean through Πψ). Fix
+  `a46f372`: `Utils/projectors.affine_sample_2d()` — a manual bilinear sampler
+  (gather-based) with identical forward/grad to `F.grid_sample` (max err 1e-14,
+  `gradgradcheck=True`); grid is independent of image values so it is linear in
+  the input and supports arbitrary-order derivatives. Regression tests added
+  (65 pass). Both modes smoke-tested through the full variational `train` step.
+- **Duplicate mog re-run (waste):** the old `monitor_topup4.sh` had already
+  completed mog run_0003..0009 before the unified monitor was launched, which
+  `count_ours`-ed 0 and re-submitted the same 7 (jobs 604576…604823, ~2.5 h each).
+  The `monitor_unified2.sh` queue (MNIST rotation/zoom, then remaining class jobs)
+  now resumes from the correct point (banana run_0000 already submitted). Cap-3
+  respected throughout.
+- Regeneration pending once runs finish: `samples_gen` (7-mode MNIST gallery via
+  `sample_recon.py`) and `eval_perturbation.py` per class run → perturbation table;
+  also prune the duplicate mog run dirs before aggregation.

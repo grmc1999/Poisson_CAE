@@ -526,9 +526,16 @@ Same run-artifact contract as Phase 1. `t = d/4` heuristic for tabular/images
 - [ ] Baselines: AE (no corruption), CAE (lam>0), DAE (lam=0), VAE
       (DAE obtainable as a `train.lam=0` config; AE/VAE need model additions)
 - [ ] Ablations: λ, locality radius R, neighbors k, global-vs-localized estimator,
-      corruption mode (gaussian / ddpm / shift_scale),
-      diffusion-kernel vs variational (Ritz) potential solver
-      (grid machinery committed via `sweep.py`; sweep submissions pending)
+      corruption mode, diffusion-kernel vs variational (Ritz) potential solver
+      (grid machinery via `sweep.py`)
+  - [~] **Corruption-mode ablation** — `gaussian`, `mask`, `dropout`, `shift_scale`,
+        `ddpm` on every task; `rotation` / `zoom` for MNIST reconstruction only
+        (Part A; affine resample of the 28×28 layout). Sweeps
+        `sample_ablation_mnist` + `class_ablation_{banana,rings,spirals,breast_cancer}`
+        generated and running (Sep 17).
+  - [~] **Classification perturbation benchmark** (Part B) — per-mode clean vs
+        corrupted test accuracy via `eval_perturbation.py` → `perturbation_eval.json`;
+        banana/rings/spirals/breast_cancer now have held-out test splits (Sep 17).
 - [ ] Metrics: task accuracy/MSE under corruption, linear-probe representation quality,
       ‖J_f‖ control, compute scaling curves
       (accuracy/MSE already recorded per run by `run.py` + `scripts/collect_results.py`)
