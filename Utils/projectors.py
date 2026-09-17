@@ -10,6 +10,63 @@ from typing import Optional, Tuple, Dict
 def linear_beta_schedule(T: int, beta_start: float = 1e-4, beta_end: float = 2e-2) -> torch.Tensor:
     return torch.linspace(beta_start, beta_end, T)
 
+
+def affine_sample_2d(img: torch.Tensor, theta: torch.Tensor) -> torch.Tensor:
+    """Differentiable bilinear affine resampling of a single-channel image batch.
+
+    Drop-in replacement for ``F.grid_sample(F.affine_grid(theta, img.shape),
+    align_corners=False)`` with zero padding. ``theta`` is ``(B, 2, 3)`` and maps
+    output normalized coordinates to input normalized coordinates.
+
+    Implemented with ``gather`` + arithmetic instead of ``F.grid_sample`` because
+    ``aten::grid_sampler_2d_backward`` has no double-backward implementation,
+    which the bilevel Poisson estimator requires. Since the sampling grid does not
+    depend on ``img`` values, the operation is linear in ``img`` and therefore
+    supports arbitrary higher-order derivatives.
+    """
+    B, C, H, W = img.shape
+    device, dtype = img.device, img.dtype
+
+    ys = torch.arange(H, device=device, dtype=dtype)
+    xs = torch.arange(W, device=device, dtype=dtype)
+    # normalized coords, align_corners=False: (2*idx + 1)/size - 1
+    gy = (2.0 * ys + 1.0) / H - 1.0
+    gx = (2.0 * xs + 1.0) / W - 1.0
+    gyy, gxx = torch.meshgrid(gy, gx, indexing="ij")
+    ones = torch.ones_like(gxx)
+    coords = torch.stack([gxx, gyy, ones], dim=-1).reshape(-1, 3)  # (H*W, 3)
+
+    inorm = torch.einsum("bij,nj->bni", theta, coords)  # (B, H*W, 2)
+    # back to pixel coordinates: pix = ((norm + 1)*size - 1)/2
+    ix = ((inorm[..., 0] + 1.0) * W - 1.0) / 2.0
+    iy = ((inorm[..., 1] + 1.0) * H - 1.0) / 2.0
+
+    x0 = torch.floor(ix)
+    y0 = torch.floor(iy)
+    dx = (ix - x0).unsqueeze(1)  # (B, 1, H*W)
+    dy = (iy - y0).unsqueeze(1)
+    x0 = x0.long()
+    y0 = y0.long()
+
+    flat = img.reshape(B, C, H * W)
+
+    def _gather(yy, xx):
+        valid = ((yy >= 0) & (yy < H) & (xx >= 0) & (xx < W)).unsqueeze(1).to(dtype)
+        idx = (yy.clamp(0, H - 1) * W + xx.clamp(0, W - 1)).unsqueeze(1)
+        return flat.gather(2, idx.expand(-1, C, -1)) * valid
+
+    w00 = (1.0 - dx) * (1.0 - dy)
+    w01 = dx * (1.0 - dy)
+    w10 = (1.0 - dx) * dy
+    w11 = dx * dy
+    out = (
+        w00 * _gather(y0, x0)
+        + w01 * _gather(y0, x0 + 1)
+        + w10 * _gather(y0 + 1, x0)
+        + w11 * _gather(y0 + 1, x0 + 1)
+    )
+    return out.reshape(B, C, H, W)
+
 def make_ddpm_coeffs(betas: torch.Tensor) -> Dict[str, torch.Tensor]:
     alphas = 1.0 - betas
     alpha_bars = torch.cumprod(alphas, dim=0)
@@ -107,8 +164,7 @@ class CorruptionOperator(nn.Module):
             img = x.view(B, 1, s, s)
             theta = torch.zeros(B, 2, 3, device=x.device, dtype=x.dtype)
             theta[:, :2, :2] = R
-            grid = F.affine_grid(theta, img.shape, align_corners=False)
-            return F.grid_sample(img, grid, align_corners=False).view(B, -1)
+            return affine_sample_2d(img, theta).view(B, -1)
         if x.size(1) < 2:
             return x
         # rotate the first two coordinates about the origin
@@ -130,8 +186,7 @@ class CorruptionOperator(nn.Module):
             # sampling grid shrinks for scale>1 -> magnify (zoom in)
             theta[:, 0, 0] = 1.0 / scale
             theta[:, 1, 1] = 1.0 / scale
-            grid = F.affine_grid(theta, img.shape, align_corners=False)
-            return F.grid_sample(img, grid, align_corners=False).view(B, -1)
+            return affine_sample_2d(img, theta).view(B, -1)
         return x * scale.view(B, *([1] * (x.dim() - 1)))
 
     def forward(self, x: torch.Tensor, t: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:

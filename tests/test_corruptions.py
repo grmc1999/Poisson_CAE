@@ -1,7 +1,8 @@
 """Tests for new corruption modes (mask, dropout)."""
 import torch
+import torch.nn.functional as F
 
-from Utils.projectors import CorruptionConfig, CorruptionOperator
+from Utils.projectors import CorruptionConfig, CorruptionOperator, affine_sample_2d
 
 
 def test_mask_corrupt_shape_and_frac():
@@ -83,3 +84,46 @@ def test_zoom_image_shape():
         CorruptionConfig(mode="zoom", zoom_std=0.2, image_side=28)
     )(x)
     assert x_t.shape == x.shape
+
+
+def test_affine_sample_2d_matches_grid_sample():
+    torch.manual_seed(0)
+    B, C, H, W = 4, 1, 28, 28
+    img = torch.randn(B, C, H, W, dtype=torch.float64)
+    theta = torch.zeros(B, 2, 3, dtype=torch.float64)
+    for b in range(B):
+        ang = torch.rand(()).item() * 0.6 - 0.3
+        scale = 1.0 + torch.rand(()).item() * 0.3 - 0.15
+        theta[b, 0, 0] = torch.cos(torch.tensor(ang)) / scale
+        theta[b, 0, 1] = -torch.sin(torch.tensor(ang)) / scale
+        theta[b, 1, 0] = torch.sin(torch.tensor(ang)) / scale
+        theta[b, 1, 1] = torch.cos(torch.tensor(ang)) / scale
+
+    ref = F.grid_sample(img, F.affine_grid(theta, img.shape, align_corners=False),
+                        align_corners=False)
+    out = affine_sample_2d(img, theta)
+    assert torch.allclose(out, ref, atol=1e-10)
+
+    img1 = img.clone().requires_grad_(True)
+    img2 = img.clone().requires_grad_(True)
+    g1 = torch.autograd.grad(affine_sample_2d(img1, theta).sum(), img1)[0]
+    ref2 = F.grid_sample(img2, F.affine_grid(theta, img.shape, align_corners=False),
+                         align_corners=False)
+    g2 = torch.autograd.grad(ref2.sum(), img2)[0]
+    assert torch.allclose(g1, g2, atol=1e-10)
+
+
+def test_affine_sample_2d_supports_double_backward():
+    # F.grid_sample cannot be double-differentiated; the bilevel estimator needs
+    # this, so the manual sampler must pass gradgradcheck.
+    torch.manual_seed(0)
+    B, H, W = 3, 28, 28
+    img = torch.randn(B, 1, H, W, dtype=torch.float64)
+    theta = torch.zeros(B, 2, 3, dtype=torch.float64)
+    theta[:, 0, 0] = 0.9
+    theta[:, 1, 1] = 0.9
+    inp = img.clone().requires_grad_(True)
+    assert torch.autograd.gradgradcheck(
+        lambda z: (affine_sample_2d(z, theta) ** 2).mean(), inp
+    )
+
