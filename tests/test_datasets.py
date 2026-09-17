@@ -30,10 +30,12 @@ def test_get_experiment_loaders_spirals():
     )
     assert input_dim == 2
     assert task == "classification"
-    assert test_loader is None
+    assert test_loader is not None  # fresh held-out draw (distinct seed)
     batch = next(iter(loader))
     assert len(batch) == 2  # (x, y)
     assert batch[0].shape[1] == 2
+    test_batch = next(iter(test_loader))
+    assert test_batch[0].shape[1] == 2 and test_batch[1].dtype == torch.long
 
 
 def test_loaders_reconstruction_mog(monkeypatch):

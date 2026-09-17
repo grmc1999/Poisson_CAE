@@ -25,6 +25,28 @@ from models import (
 )
 
 
+def build_corruption_operator(cfg: ExperimentConfig) -> CorruptionOperator:
+    """Build the corruption operator Pi from a config.
+
+    rotation/zoom operate on the spatial layout; MNIST flat is seen as 28x28.
+    """
+    image_side = 28 if cfg.data.experiment == "mnist_flat" else 0
+    return CorruptionOperator(
+        CorruptionConfig(
+            mode=cfg.train.corruption_mode,
+            T=cfg.train.corruption_T,
+            beta_start=cfg.train.corruption_beta_start,
+            beta_end=cfg.train.corruption_beta_end,
+            sigma=cfg.train.corruption_sigma,
+            mask_frac=cfg.train.corruption_mask_frac,
+            drop_p=cfg.train.corruption_drop_p,
+            rotation_max_deg=cfg.train.corruption_rotation_max_deg,
+            zoom_std=cfg.train.corruption_zoom_std,
+            image_side=image_side,
+        )
+    )
+
+
 def build_components(
     cfg: ExperimentConfig,
     device: str,
@@ -95,17 +117,7 @@ def build_components(
         raise ValueError(f"Unknown task: {task}")
 
     # ---- corruption operator --------------------------------------------
-    Pi = CorruptionOperator(
-        CorruptionConfig(
-            mode=cfg.train.corruption_mode,
-            T=cfg.train.corruption_T,
-            beta_start=cfg.train.corruption_beta_start,
-            beta_end=cfg.train.corruption_beta_end,
-            sigma=cfg.train.corruption_sigma,
-            mask_frac=cfg.train.corruption_mask_frac,
-            drop_p=cfg.train.corruption_drop_p,
-        )
-    )
+    Pi = build_corruption_operator(cfg)
 
     # ---- estimator ------------------------------------------------------
     estimator = build_estimator(cfg.estimator, d=input_dim)

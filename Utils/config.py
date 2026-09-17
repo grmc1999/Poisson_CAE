@@ -59,13 +59,15 @@ class TrainConfig:
     steps: int = 5000
     viz_every: int = 500
     viz_dir: str = "outputs"
-    corruption_mode: str = "gaussian"   # gaussian | ddpm | shift_scale | mixture | mask | dropout
+    corruption_mode: str = "gaussian"   # gaussian | ddpm | shift_scale | mixture | mask | dropout | rotation | zoom
     corruption_T: int = 200
     corruption_beta_start: float = 1e-4
     corruption_beta_end: float = 2e-2
     corruption_sigma: float = 0.1
     corruption_mask_frac: float = 0.3   # fraction of dims zeroed out (mask mode)
     corruption_drop_p: float = 0.2      # Bernoulli keep-prob (dropout mode, 0=full keep)
+    corruption_rotation_max_deg: float = 30.0  # max |angle| (rotation mode)
+    corruption_zoom_std: float = 0.15   # max |scale-1| (zoom mode)
     poisson_eps: float = 1e-2
 
 
@@ -306,6 +308,7 @@ def method_tag(cfg: ExperimentConfig) -> str:
     parts.append(f"t{_fmt_num(cfg.estimator.t)}")
     parts.append(f"lam{_fmt_num(cfg.train.lam)}")
     parts.append(f"s{cfg.data.seed}")
+    parts.append(f"{cfg.train.corruption_mode}")
     return "-".join(parts)
 
 

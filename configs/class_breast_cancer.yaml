@@ -1,0 +1,39 @@
+# Breast cancer Wisconsin (30D) classification - perturbation training ablation.
+# Variational (bilevel) estimator, exact hparams of the completed Phase-2 runs
+# (configs/breast_cancer.yaml + scheme=variational, bilevel, K=100, inner_lr=0.1).
+name: breast_cancer
+data:
+  experiment: breast_cancer
+  batch_size: 256
+  seed: 0
+  encoder_type: mlp
+
+model:
+  hidden: 128
+  z_dim: 32
+
+train:
+  lr: 1.0e-3
+  lam: 1.0e-2
+  landmarks: 128
+  steps: 3000
+  viz_every: 500
+  viz_dir: outputs
+  corruption_mode: gaussian
+  corruption_sigma: 0.1
+
+estimator:
+  scheme: variational
+  kernel_type: diffusion
+  t: 7.5
+  eps: 1.0e-2
+  k: 32
+  normalize: true
+  mu: 1.0e-2
+  v_hidden: 128
+  v_layers: 3
+  inner_steps: 100
+  inner_lr: 0.1
+  lam_d: 1.0
+  inner_max_grad_norm: 0.5
+  bilevel: true

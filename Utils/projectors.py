@@ -1,5 +1,8 @@
+import math
+
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
 
@@ -20,7 +23,8 @@ def make_ddpm_coeffs(betas: torch.Tensor) -> Dict[str, torch.Tensor]:
 
 @dataclass
 class CorruptionConfig:
-    mode: str = "ddpm"          # "ddpm", "gaussian", "shift_scale", "mixture", "mask", "dropout"
+    mode: str = "ddpm"          # "ddpm", "gaussian", "shift_scale", "mixture", "mask", "dropout",
+                                # "rotation", "zoom"
     T: int = 200
     beta_start: float = 1e-4
     beta_end: float = 2e-2
@@ -32,6 +36,9 @@ class CorruptionConfig:
     p_shift_scale: float = 0.2
     mask_frac: float = 0.3       # fraction of dims zeroed (mask mode)
     drop_p: float = 0.2          # probability of dropping a dim (dropout mode)
+    rotation_max_deg: float = 30.0  # max |angle| (rotation mode)
+    zoom_std: float = 0.15       # max |scale-1| (zoom mode)
+    image_side: int = 0          # >0 -> interpret flat input as (side, side) images
 
 class CorruptionOperator(nn.Module):
     def __init__(self, cfg: CorruptionConfig):
@@ -77,6 +84,56 @@ class CorruptionOperator(nn.Module):
         mask = (torch.rand_like(x) < keep).float()
         return x * mask
 
+    def _rotation_matrices(self, x: torch.Tensor) -> torch.Tensor:
+        """Per-sample 2x2 rotation matrices, angle ~ U(-max_deg, max_deg)."""
+        B = x.size(0)
+        if self.cfg.rotation_max_deg <= 0:
+            return torch.eye(2, device=x.device, dtype=x.dtype).expand(B, 2, 2).clone()
+        ang = (2.0 * torch.rand(B, device=x.device, dtype=x.dtype) - 1.0) * (
+            self.cfg.rotation_max_deg * math.pi / 180.0
+        )
+        cos, sin = torch.cos(ang), torch.sin(ang)
+        row0 = torch.stack([cos, -sin], dim=1)
+        row1 = torch.stack([sin, cos], dim=1)
+        return torch.stack([row0, row1], dim=1)  # (B,2,2)
+
+    def rotation_corrupt(self, x: torch.Tensor) -> torch.Tensor:
+        B = x.size(0)
+        if self.cfg.rotation_max_deg <= 0:
+            return x
+        R = self._rotation_matrices(x)
+        if self.cfg.image_side > 0:
+            s = self.cfg.image_side
+            img = x.view(B, 1, s, s)
+            theta = torch.zeros(B, 2, 3, device=x.device, dtype=x.dtype)
+            theta[:, :2, :2] = R
+            grid = F.affine_grid(theta, img.shape, align_corners=False)
+            return F.grid_sample(img, grid, align_corners=False).view(B, -1)
+        if x.size(1) < 2:
+            return x
+        # rotate the first two coordinates about the origin
+        xy = x[:, :2]
+        xy_rot = torch.bmm(xy.unsqueeze(1), R.transpose(1, 2)).squeeze(1)
+        if x.size(1) == 2:
+            return xy_rot
+        return torch.cat([xy_rot, x[:, 2:]], dim=1)
+
+    def zoom_corrupt(self, x: torch.Tensor) -> torch.Tensor:
+        B = x.size(0)
+        if self.cfg.zoom_std <= 0:
+            return x
+        scale = 1.0 + (2.0 * torch.rand(B, device=x.device, dtype=x.dtype) - 1.0) * self.cfg.zoom_std
+        if self.cfg.image_side > 0:
+            s = self.cfg.image_side
+            img = x.view(B, 1, s, s)
+            theta = torch.zeros(B, 2, 3, device=x.device, dtype=x.dtype)
+            # sampling grid shrinks for scale>1 -> magnify (zoom in)
+            theta[:, 0, 0] = 1.0 / scale
+            theta[:, 1, 1] = 1.0 / scale
+            grid = F.affine_grid(theta, img.shape, align_corners=False)
+            return F.grid_sample(img, grid, align_corners=False).view(B, -1)
+        return x * scale.view(B, *([1] * (x.dim() - 1)))
+
     def forward(self, x: torch.Tensor, t: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         mode = self.cfg.mode
         if mode == "ddpm":
@@ -90,6 +147,10 @@ class CorruptionOperator(nn.Module):
             return self.mask_corrupt(x), None
         if mode == "dropout":
             return self.dropout_corrupt(x), None
+        if mode == "rotation":
+            return self.rotation_corrupt(x), None
+        if mode == "zoom":
+            return self.zoom_corrupt(x), None
         if mode == "mixture":
             B = x.size(0)
             device = x.device

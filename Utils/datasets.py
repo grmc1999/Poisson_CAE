@@ -239,19 +239,33 @@ def get_experiment_loaders(
       - "regression"
       - "reconstruction"
 
-    For 2D patterns, we return only train_loader by default (easy to visualize).
-    For breast_cancer and sinusoid_reg, we provide train+test.
+    For 2D classification patterns, the test set is a fresh held-out draw with a
+    distinct RNG seed (keeps the 6000-sample training protocol unchanged).
+    breast_cancer and sinusoid_reg use their own train/test splits.
     """
     name = str(name).lower()
+
+    def _test_loader(x_t: torch.Tensor, y_t: torch.Tensor) -> DataLoader:
+        # Held-out split evaluated without shuffling/dropping so accuracy is exact.
+        return _to_loader(
+            x_t,
+            y_t,
+            LoaderCfg(batch_size=cfg.batch_size, shuffle=False, drop_last=False,
+                      num_workers=cfg.num_workers),
+        )
+
     if name == "spirals":
         x, y = make_two_spirals(n=6000, noise=0.15, seed=seed)
-        return _to_loader(x, y, cfg), None, x.shape[1], "classification"
+        x_te, y_te = make_two_spirals(n=2000, noise=0.15, seed=seed + 1000)
+        return _to_loader(x, y, cfg), _test_loader(x_te, y_te), x.shape[1], "classification"
     if name == "banana":
         x, y = make_banana_moons(n=6000, noise=0.18, seed=seed)
-        return _to_loader(x, y, cfg), None, x.shape[1], "classification"
+        x_te, y_te = make_banana_moons(n=2000, noise=0.18, seed=seed + 1000)
+        return _to_loader(x, y, cfg), _test_loader(x_te, y_te), x.shape[1], "classification"
     if name == "rings":
         x, y = make_rings(n=6000, noise=0.06, seed=seed)
-        return _to_loader(x, y, cfg), None, x.shape[1], "classification"
+        x_te, y_te = make_rings(n=2000, noise=0.06, seed=seed + 1000)
+        return _to_loader(x, y, cfg), _test_loader(x_te, y_te), x.shape[1], "classification"
     if name == "breast_cancer":
         xtr, ytr, xte, yte = make_breast_cancer(seed=seed)
         tr = _to_loader(xtr, ytr, cfg)
